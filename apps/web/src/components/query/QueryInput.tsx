@@ -1,94 +1,324 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Monitor, Mic, ArrowRight, ChevronDown } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Paperclip, Globe, ArrowUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ContextItem } from './types';
+import { ContextChip } from './ContextChip';
+import { MentionPicker } from './MentionPicker';
+import { useUIStore } from '@/store/useUIStore';
+import { breatheVariants, sendReadyVariants } from '@/lib/motion-config';
 
 interface QueryInputProps {
-  onSubmit?: (query: string) => void;
+  onSubmit?: (query: string, context: ContextItem[]) => void;
 }
 
 export function QueryInput({ onSubmit }: QueryInputProps) {
+  const setProviderSelectorOpen = useUIStore(s => s.setProviderSelectorOpen);
+  
   const [query, setQuery] = useState('');
+  const [lastQuery, setLastQuery] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+  const [isWebSearch, setIsWebSearch] = useState(false);
+  const [mode, setMode] = useState<'Ask' | 'Research' | 'Deep Research' | 'RAG'>('Ask');
+  
+  const [contextChips, setContextChips] = useState<ContextItem[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [cursorPos, setCursorPos] = useState(0);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
+  const isReady = query.trim() || contextChips.length > 0;
+
+  // Auto-resize textarea - now always behaves as expanded
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 300)}px`;
+      textareaRef.current.style.height = `${Math.min(Math.max(textareaRef.current.scrollHeight, 40), 200)}px`;
     }
   }, [query]);
 
-  const handleSubmit = () => {
-    if (query.trim() && onSubmit) {
-      onSubmit(query.trim());
-      setQuery('');
+  const cycleMode = React.useCallback(() => {
+    setMode(prev => {
+      const modes: typeof mode[] = ['Ask', 'Research', 'Deep Research', 'RAG'];
+      return modes[(modes.indexOf(prev) + 1) % modes.length];
+    });
+  }, []);
+
+  // Global shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        textareaRef.current?.focus();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'm') {
+        e.preventDefault();
+        cycleMode();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+        e.preventDefault();
+        setIsWebSearch(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [cycleMode]);
+
+  // Handle click outside to blur
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Mention Detection
+  useEffect(() => {
+    if (!isFocused) {
+      const resetMention = () => setMentionQuery(null);
+      requestAnimationFrame(resetMention);
+      return;
+    }
+    const textBeforeCursor = query.slice(0, cursorPos);
+    const match = textBeforeCursor.match(/(?:^|\s)@([^\s]*)$/);
+    if (match) {
+      const setMatch = () => setMentionQuery(match[1]);
+      requestAnimationFrame(setMatch);
+    } else {
+      const resetMatch = () => setMentionQuery(null);
+      requestAnimationFrame(resetMatch);
+    }
+  }, [query, cursorPos, isFocused]);
+
+  const updateCursor = () => {
+    if (textareaRef.current) {
+      setCursorPos(textareaRef.current.selectionStart);
     }
   };
 
+  const removeChip = (id: string) => {
+    setContextChips(prev => prev.filter(c => c.id !== id));
+  };
+
+  const handleMentionSelect = (item: ContextItem) => {
+    const textBeforeCursor = query.slice(0, cursorPos);
+    const match = textBeforeCursor.match(/(?:^|\s)@([^\s]*)$/);
+    
+    if (match) {
+      // Calculate where the exact match started
+      const matchStart = cursorPos - match[0].length + (match[0].startsWith(' ') ? 1 : 0);
+      const newQuery = query.slice(0, matchStart) + query.slice(cursorPos);
+      setQuery(newQuery);
+    }
+    
+    if (!contextChips.find(c => c.id === item.id)) {
+      setContextChips(prev => [...prev, item]);
+    }
+    
+    setMentionQuery(null);
+    
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 0);
+  };
+
+  const handleSubmit = () => {
+    if (!isReady) return;
+    
+    setIsSubmitting(true);
+    if (query.trim()) setLastQuery(query.trim());
+    
+    setTimeout(() => {
+      if (onSubmit) onSubmit(query.trim(), contextChips);
+      setQuery('');
+      setContextChips([]);
+      setIsSubmitting(false);
+      textareaRef.current?.focus();
+    }, 150);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (mentionQuery !== null) {
+      if (['ArrowUp', 'ArrowDown', 'Enter', 'Escape'].includes(e.key)) {
+        e.preventDefault();
+        return;
+      }
+    }
+
+    if (e.key === 'ArrowUp' && query === '') {
+      e.preventDefault();
+      setQuery(lastQuery);
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = textareaRef.current.value.length;
+          textareaRef.current.selectionEnd = textareaRef.current.value.length;
+        }
+      }, 0);
+    } else if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
     }
   };
 
   return (
-    <div 
-      className={cn(
-        "w-full bg-bg-surface border border-border-subtle rounded-lg transition-colors flex flex-col shadow-sm",
-        isFocused ? "border-border-strong bg-bg-elevated" : ""
-      )}
-    >
-      <textarea
-        ref={textareaRef}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        onKeyDown={handleKeyDown}
-        placeholder="Research anything..."
-        className="w-full min-h-[80px] bg-transparent text-text-primary placeholder-text-muted text-[15px] px-4 pt-4 pb-2 resize-none focus:outline-none rounded-t-lg leading-relaxed"
-        rows={1}
-        autoFocus
-      />
+    <div className="w-full flex justify-center relative">
       
-      <div className="flex items-center justify-between px-2 pb-2 pt-1">
-        {/* Left side actions */}
-        <div className="flex items-center gap-1">
-          <button className="w-8 h-8 flex items-center justify-center rounded-md text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors">
-            <Plus className="w-4 h-4 stroke-[1.5]" />
-          </button>
+      {mentionQuery !== null && isFocused && (
+        <div className="absolute bottom-full mb-2 w-full max-w-[760px] z-50 flex justify-start pointer-events-none">
+          <MentionPicker 
+            search={mentionQuery} 
+            onSelect={handleMentionSelect} 
+            onClose={() => {
+              setMentionQuery(null);
+              textareaRef.current?.focus();
+            }} 
+          />
         </div>
+      )}
 
-        {/* Right side actions */}
-        <div className="flex items-center gap-1">
-          <button className="flex items-center gap-1.5 px-2.5 h-8 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors text-[12px] font-medium">
-            <span>Claude 3.5 Sonnet</span>
-            <ChevronDown className="w-3.5 h-3.5 opacity-70" />
-          </button>
-          
-          <div className="w-[1px] h-3 bg-border-subtle mx-1" />
+      <motion.div 
+        ref={containerRef}
+        layout
+        variants={breatheVariants}
+        initial="idle"
+        animate={isFocused && !isReady ? "idle" : "focused"}
+        style={{
+          borderColor: isFocused ? 'var(--accent)' : 'var(--border-subtle)',
+        }}
+        transition={{ duration: 0.15, ease: 'easeOut' }}
+        className={cn(
+          "w-full max-w-[760px] border rounded-xl overflow-visible flex flex-col transition-colors relative z-40 min-h-[120px]",
+          isFocused ? "glass-surface" : "bg-bg-surface"
+        )}
+        onClick={() => {
+          if (!isFocused) {
+            textareaRef.current?.focus();
+          }
+        }}
+      >
+        {/* Context Chips Zone */}
+        <AnimatePresence>
+          {contextChips.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="flex flex-wrap gap-2 px-4 pt-4 pb-1 overflow-hidden"
+            >
+              {contextChips.map(chip => (
+                <ContextChip key={chip.id} item={chip} onRemove={removeChip} />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-          <button className="flex items-center gap-1.5 px-2.5 h-8 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors text-[12px] font-medium">
-            <Monitor className="w-3.5 h-3.5 stroke-[1.5]" />
-            <span>Local</span>
-          </button>
+        {/* Text Area */}
+        <motion.div 
+          animate={{ opacity: isSubmitting ? 0 : 1 }}
+          transition={{ duration: 0.1 }}
+          className="relative w-full flex-1 flex pt-3 pb-2"
+        >
+          <textarea
+            ref={textareaRef}
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              updateCursor();
+            }}
+            onKeyUp={updateCursor}
+            onClick={updateCursor}
+            onFocus={() => setIsFocused(true)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask anything, search the web, or @ a document..."
+            className="w-full bg-transparent text-text-primary placeholder-text-muted text-[15px] px-4 resize-none focus:outline-none leading-relaxed font-sans scrollbar-hide"
+            style={{ 
+              lineHeight: '24px',
+            }}
+            rows={1}
+          />
+        </motion.div>
 
-          <button className="w-8 h-8 flex items-center justify-center rounded-md text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors ml-1">
-            <Mic className="w-4 h-4 stroke-[1.5]" />
-          </button>
+        {/* Toolbar - Now Permanently Visible */}
+        <div className="flex items-center justify-between px-3 pb-3 pt-2 mt-auto border-t border-border-subtle/50 mx-2">
+          {/* Left Actions */}
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={(e) => { e.stopPropagation(); cycleMode(); }}
+              className="flex items-center pl-2 pr-1.5 py-1 rounded hover:bg-bg-elevated transition-colors border-l-2 border-accent group"
+              title="Cycle Mode (Cmd+M)"
+            >
+              <AnimatePresence mode="wait">
+                <motion.span 
+                  key={mode}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.15, ease: 'easeOut' }}
+                  className="text-[11px] font-mono text-accent font-medium tracking-wide uppercase group-hover:text-accent-bright transition-colors"
+                >
+                  {mode}
+                </motion.span>
+              </AnimatePresence>
+            </button>
 
-          <button 
-            onClick={handleSubmit}
-            disabled={!query.trim()}
-            className="w-8 h-8 flex items-center justify-center rounded-md bg-accent text-bg-base disabled:opacity-20 disabled:bg-border-subtle disabled:text-text-muted transition-colors [&:not(:disabled)]:hover:bg-accent-hover ml-2"
-          >
-            <ArrowRight className="w-4 h-4 stroke-[2]" />
-          </button>
+            <div className="w-[1px] h-3 bg-border-strong" />
+
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={(e) => { e.stopPropagation(); setIsWebSearch(!isWebSearch); }}
+                className="w-7 h-7 flex items-center justify-center rounded hover:bg-bg-elevated transition-colors"
+                title="Toggle Web Search (Cmd+/)"
+              >
+                <Globe className={cn("w-[18px] h-[18px] transition-colors", isWebSearch ? "text-accent fill-accent/20" : "text-text-muted stroke-[1.5]")} />
+              </button>
+              <button 
+                onClick={(e) => e.stopPropagation()}
+                className="w-7 h-7 flex items-center justify-center rounded hover:bg-bg-elevated text-text-muted hover:text-text-primary transition-colors"
+                title="Attach Context (@)"
+              >
+                <Paperclip className="w-[18px] h-[18px] stroke-[1.5]" />
+              </button>
+            </div>
+          </div>
+
+          {/* Right Actions */}
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={(e) => { e.stopPropagation(); setProviderSelectorOpen(true); }}
+              className="flex items-center gap-2 px-2.5 h-6 rounded bg-bg-elevated hover:bg-border-subtle transition-colors"
+              title="Select Model (Cmd+Shift+S)"
+            >
+              <div className="w-1.5 h-1.5 rounded-full bg-success shadow-[0_0_8px_rgba(52,211,153,0.4)]" />
+              <span className="text-[11px] font-mono text-accent">llama3.2</span>
+            </button>
+
+            <motion.button 
+              variants={sendReadyVariants}
+              initial="idle"
+              animate={isReady ? "ready" : "idle"}
+              whileTap="pressed"
+              onClick={(e) => { e.stopPropagation(); handleSubmit(); }}
+              disabled={!isReady}
+              className={cn(
+                "w-9 h-9 flex items-center justify-center rounded-lg transition-colors ml-1",
+                isReady
+                  ? "bg-accent text-bg-base hover:bg-accent-hover shadow-shadow-glow"
+                  : "bg-bg-elevated text-text-muted border border-border-subtle"
+              )}
+            >
+              <ArrowUp className={cn("w-5 h-5", isReady ? "stroke-[2.5]" : "stroke-[2]")} />
+            </motion.button>
+          </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
