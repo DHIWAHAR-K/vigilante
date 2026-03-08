@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Gentium_Book_Plus } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/layout/AppShell";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const gentium = Gentium_Book_Plus({
+  weight: ["400", "700"],
+  variable: "--font-serif",
   subsets: ["latin"],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+  variable: "--font-mono",
   subsets: ["latin"],
 });
 
@@ -26,7 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${gentium.variable} ${geistMono.variable} antialiased font-serif`}>
         <ThemeProvider
           attribute="data-theme"
           defaultTheme="system"

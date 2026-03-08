@@ -56,7 +56,7 @@ export function ThemeToggle({ collapsed = false }: ThemeToggleProps) {
   return (
     <button 
       onClick={cycleTheme}
-      className="w-full flex items-center gap-3 px-3 h-10 rounded-xl text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors text-left overflow-hidden group"
+      className="w-full flex items-center gap-3 px-3 h-10 rounded-xl text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors text-left overflow-hidden group relative"
     >
       <div className="w-5 flex justify-center relative h-5 items-center">
         <AnimatePresence mode="wait" initial={false}>
@@ -80,12 +80,14 @@ export function ThemeToggle({ collapsed = false }: ThemeToggleProps) {
              animate={{ opacity: 1, y: 0 }}
              exit={{ opacity: 0, y: 10 }}
              transition={{ duration: 0.2 }}
-             className="absolute inset-0 text-[13px] font-medium flex items-center"
+             className="absolute inset-0 text-body-sm flex items-center"
            >
              {getLabel()}
            </motion.span>
          </AnimatePresence>
       </div>
+      {/* Precision notch */}
+      <div className="absolute top-0 right-0 w-0.5 h-full bg-accent" />
     </button>
   );
 }

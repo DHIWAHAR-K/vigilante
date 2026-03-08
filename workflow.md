@@ -23,7 +23,7 @@
 8. [Data Flow Diagrams](#8-data-flow-diagrams)
 9. [API Contract](#9-api-contract)
 10. [Tech Stack Decisions](#10-tech-stack-decisions)
-11. [Development Phases (MVP Roadmap)](#11-development-phases-mvp-roadmap)
+11. [Development Phases (MVP Roadmap)](#11-development-phases-mvp-roadmap),
 12. [Contributing Guidelines](#12-contributing-guidelines)
 
 ---

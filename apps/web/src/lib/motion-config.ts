@@ -79,3 +79,12 @@ export const queryBarSlideUp: Variants = {
     transition: { duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] } 
   }
 };
+
+// New precision notch variant for subtle accent animations
+export const precisionNotchVariants: Variants = {
+  idle: { opacity: 0 },
+  active: { 
+    opacity: 1,
+    transition: { duration: 0.15, ease: 'easeOut' }
+  }
+};

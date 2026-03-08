@@ -64,7 +64,7 @@ export function MentionPicker({ search, onSelect, onClose }: MentionPickerProps)
   return (
     <div className="w-[300px] bg-bg-surface border border-border-strong rounded-lg shadow-2xl overflow-hidden flex flex-col pointer-events-auto">
       <div className="px-3 py-2 border-b border-border-subtle bg-bg-base/50 shrink-0">
-        <span className="text-[10px] uppercase tracking-wider font-mono text-text-muted">
+        <span className="text-caption uppercase tracking-wider text-text-muted">
           Add Context
         </span>
       </div>
@@ -85,7 +85,7 @@ export function MentionPicker({ search, onSelect, onClose }: MentionPickerProps)
             {item.type === 'doc' && <FileText className="w-4 h-4 text-accent shrink-0" />}
             {item.type === 'chat' && <MessageSquare className="w-4 h-4 text-text-muted shrink-0" />}
             {item.type === 'url' && <Globe className="w-4 h-4 text-text-muted shrink-0" />}
-            <span className="text-[13px] truncate font-medium">{item.title}</span>
+            <span className="text-body-sm truncate">{item.title}</span>
           </button>
         ))}
       </div>

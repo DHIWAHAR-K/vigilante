@@ -68,8 +68,9 @@ module.exports = {
         sm: "2px",
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)"],
-        mono: ["var(--font-geist-mono)"],
+        serif: ["var(--font-serif)", "serif"],
+        sans: ["var(--font-serif)", "serif"], // Map sans to serif to enforce the global change
+        mono: ["var(--font-mono)", "monospace"],
       },
     },
   },

@@ -16,6 +16,7 @@ interface QueryInputProps {
 
 export function QueryInput({ onSubmit }: QueryInputProps) {
   const setProviderSelectorOpen = useUIStore(s => s.setProviderSelectorOpen);
+  const { isSidebarCollapsed, toggleSidebar } = useUIStore();
   
   const [query, setQuery] = useState('');
   const [lastQuery, setLastQuery] = useState('');
@@ -141,6 +142,12 @@ export function QueryInput({ onSubmit }: QueryInputProps) {
       setQuery('');
       setContextChips([]);
       setIsSubmitting(false);
+      
+      // Auto-collapse sidebar when submitting a message
+      if (!isSidebarCollapsed) {
+        toggleSidebar();
+      }
+      
       textareaRef.current?.focus();
     }, 150);
   };
@@ -195,8 +202,8 @@ export function QueryInput({ onSubmit }: QueryInputProps) {
         }}
         transition={{ duration: 0.15, ease: 'easeOut' }}
         className={cn(
-          "w-full max-w-[760px] border rounded-xl overflow-visible flex flex-col transition-colors relative z-40 min-h-[120px]",
-          isFocused ? "glass-surface" : "bg-bg-surface"
+          "w-full max-w-[760px] border rounded-xl overflow-visible flex flex-col transition-colors relative z-40 min-h-[120px] relative",
+          isFocused ? "glass-surface" : "bg-bg-elevated"
         )}
         onClick={() => {
           if (!isFocused) {
@@ -204,6 +211,14 @@ export function QueryInput({ onSubmit }: QueryInputProps) {
           }
         }}
       >
+        {/* Ambient stage field - subtle radial glow */}
+        <div className="absolute inset-0 rounded-xl pointer-events-none overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-radial from-accent/5 via-transparent to-transparent opacity-30" />
+        </div>
+        
+        {/* Precision notch accent */}
+        <div className="absolute top-0 left-0 w-0.5 h-full bg-accent" />
+        
         {/* Context Chips Zone */}
         <AnimatePresence>
           {contextChips.length > 0 && (
@@ -238,21 +253,21 @@ export function QueryInput({ onSubmit }: QueryInputProps) {
             onFocus={() => setIsFocused(true)}
             onKeyDown={handleKeyDown}
             placeholder="Ask anything, search the web, or @ a document..."
-            className="w-full bg-transparent text-text-primary placeholder-text-muted text-[15px] px-4 resize-none focus:outline-none leading-relaxed font-sans scrollbar-hide"
+            className="w-full bg-transparent text-text-primary placeholder-text-muted text-body-lg px-4 resize-none focus:outline-none leading-relaxed scrollbar-hide relative z-10"
             style={{ 
-              lineHeight: '24px',
+              lineHeight: '1.6',
             }}
             rows={1}
           />
         </motion.div>
 
         {/* Toolbar - Now Permanently Visible */}
-        <div className="flex items-center justify-between px-3 pb-3 pt-2 mt-auto border-t border-border-subtle/50 mx-2">
+        <div className="flex items-center justify-between px-3 pb-3 pt-2 mt-auto border-t border-border-subtle/50 mx-2 relative z-10">
           {/* Left Actions */}
           <div className="flex items-center gap-3">
             <button 
               onClick={(e) => { e.stopPropagation(); cycleMode(); }}
-              className="flex items-center pl-2 pr-1.5 py-1 rounded hover:bg-bg-elevated transition-colors border-l-2 border-accent group"
+              className="flex items-center pl-2 pr-1.5 py-1 rounded hover:bg-bg-elevated transition-colors border-l-2 border-accent group relative"
               title="Cycle Mode (Cmd+M)"
             >
               <AnimatePresence mode="wait">
@@ -262,11 +277,13 @@ export function QueryInput({ onSubmit }: QueryInputProps) {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
                   transition={{ duration: 0.15, ease: 'easeOut' }}
-                  className="text-[11px] font-mono text-accent font-medium tracking-wide uppercase group-hover:text-accent-bright transition-colors"
+                  className="text-caption text-accent tracking-wide uppercase group-hover:text-accent-bright transition-colors"
                 >
                   {mode}
                 </motion.span>
               </AnimatePresence>
+              {/* Precision notch for mode button */}
+              <div className="absolute top-0 right-0 w-0.5 h-full bg-accent" />
             </button>
 
             <div className="w-[1px] h-3 bg-border-strong" />
@@ -293,11 +310,13 @@ export function QueryInput({ onSubmit }: QueryInputProps) {
           <div className="flex items-center gap-2">
             <button 
               onClick={(e) => { e.stopPropagation(); setProviderSelectorOpen(true); }}
-              className="flex items-center gap-2 px-2.5 h-6 rounded bg-bg-elevated hover:bg-border-subtle transition-colors"
+              className="flex items-center gap-2 px-2.5 h-6 rounded bg-bg-elevated hover:bg-border-subtle transition-colors relative"
               title="Select Model (Cmd+Shift+S)"
             >
               <div className="w-1.5 h-1.5 rounded-full bg-success shadow-[0_0_8px_rgba(52,211,153,0.4)]" />
-              <span className="text-[11px] font-mono text-accent">llama3.2</span>
+              <span className="text-mono-xs text-accent">llama3.2</span>
+              {/* Precision notch for model selector */}
+              <div className="absolute top-0 right-0 w-0.5 h-full bg-accent" />
             </button>
 
             <motion.button 
@@ -308,7 +327,7 @@ export function QueryInput({ onSubmit }: QueryInputProps) {
               onClick={(e) => { e.stopPropagation(); handleSubmit(); }}
               disabled={!isReady}
               className={cn(
-                "w-9 h-9 flex items-center justify-center rounded-lg transition-colors ml-1",
+                "w-9 h-9 flex items-center justify-center rounded-lg transition-colors ml-1 relative z-10",
                 isReady
                   ? "bg-accent text-bg-base hover:bg-accent-hover shadow-shadow-glow"
                   : "bg-bg-elevated text-text-muted border border-border-subtle"

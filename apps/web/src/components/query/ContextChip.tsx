@@ -9,11 +9,11 @@ interface ContextChipProps {
 
 export function ContextChip({ item, onRemove }: ContextChipProps) {
   return (
-    <div className="flex items-center gap-1.5 px-2 py-0.5 h-6 rounded bg-bg-elevated border border-border-subtle group">
+    <div className="flex items-center gap-1.5 px-2 py-0.5 h-6 rounded bg-bg-elevated border border-border-subtle group relative">
       {item.type === 'doc' && <FileText className="w-3 h-3 text-accent" />}
       {item.type === 'chat' && <MessageSquare className="w-3 h-3 text-text-muted" />}
       {item.type === 'url' && <Globe className="w-3 h-3 text-text-muted" />}
-      <span className="text-[11px] font-mono text-text-secondary">{item.title}</span>
+      <span className="text-caption text-text-secondary">{item.title}</span>
       <button 
         type="button"
         onClick={(e) => { e.stopPropagation(); onRemove(item.id); }} 
@@ -22,6 +22,8 @@ export function ContextChip({ item, onRemove }: ContextChipProps) {
       >
         <X className="w-3 h-3 text-text-muted" />
       </button>
+      {/* Precision notch */}
+      <div className="absolute top-0 right-0 w-0.5 h-full bg-accent" />
     </div>
   );
 }

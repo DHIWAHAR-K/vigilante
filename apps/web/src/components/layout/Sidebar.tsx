@@ -50,13 +50,13 @@ export function Sidebar() {
       initial={false}
       animate={{ width: isSidebarCollapsed ? 64 : 260 }}
       transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="h-full bg-bg-surface border-r border-border-subtle flex flex-col shrink-0 z-10 relative overflow-hidden"
+      className="h-full bg-bg-surface border-r border-border-strong flex flex-col shrink-0 z-10 relative overflow-hidden"
     >
       {/* Top region (drag area for Tauri) */}
-      <div className="h-8 w-full shrink-0 absolute top-0 left-0" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
+      <div className="h-6 w-full shrink-0 absolute top-0 left-0" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
 
       {/* Main sidebar content wrapper */}
-      <div className="flex flex-col flex-1 h-full w-[260px] pt-8">
+      <div className="flex flex-col flex-1 h-full w-[260px] pt-6">
         <SidebarHeader />
         
         <SidebarNav activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -69,7 +69,7 @@ export function Sidebar() {
         )}
         
         <div className={cn(
-          "mt-auto bg-bg-surface z-20 shrink-0 border-t border-border-subtle",
+          "mt-auto bg-bg-surface z-20 shrink-0 border-t border-border-strong",
           isSidebarCollapsed ? "w-[64px]" : "w-[260px] px-2 pb-3 pt-3"
         )}>
            <SidebarFooter isSidebarCollapsed={isSidebarCollapsed} isOnline={isOnline} />

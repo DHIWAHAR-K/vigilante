@@ -18,6 +18,22 @@ export function ThemeSegmentedControl() {
   // Prevent hydration mismatch
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
+
+  if (!mounted) {
+    return null;
+  }
+
+  if (!mounted) {
+    return null;
+  }
+
+  if (!mounted) {
+    return null;
+  }
+
+  if (!mounted) {
+    return null;
+  }
   
   if (!mounted) {
     return (
@@ -36,7 +52,7 @@ export function ThemeSegmentedControl() {
             key={option.value}
             onClick={() => setTheme(option.value)}
             className={cn(
-              "flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-[13px] font-medium transition-colors relative z-10",
+              "flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-body-sm transition-colors relative z-10",
               isActive ? "text-text-primary" : "text-text-muted hover:text-text-secondary"
             )}
           >
