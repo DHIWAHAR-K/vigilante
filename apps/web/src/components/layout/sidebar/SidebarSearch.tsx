@@ -21,7 +21,7 @@ export function SidebarSearch({ value, onChange }: SidebarSearchProps) {
           placeholder="Search conversations..."
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full h-8 bg-transparent border border-border-subtle hover:border-border-medium rounded-lg pl-8 pr-3 text-[13px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent-subtle transition-all"
+          className="w-full h-8 bg-transparent border border-border-subtle hover:border-border-medium rounded-lg pl-8 pr-3 text-body-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent-subtle transition-all"
         />
       </div>
     </div>

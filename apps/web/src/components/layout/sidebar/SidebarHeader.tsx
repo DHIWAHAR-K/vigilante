@@ -2,24 +2,31 @@ import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/store/useUIStore';
+import { VigilanteLogo } from '@/components/brand/VigilanteLogo';
 
 export function SidebarHeader() {
   const { isSidebarCollapsed, toggleSidebar } = useUIStore();
 
   return (
-    <div className="flex items-center justify-between px-3 h-14 shrink-0 mt-2 mb-2 w-full" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-      <div className={cn("flex items-center gap-3 overflow-hidden", isSidebarCollapsed && "w-0 opacity-0")}>
-        <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-text-primary text-bg-base transition-opacity shrink-0">
-          <span className="font-bold text-[14px] leading-none">V</span>
-        </button>
-        <span className="font-semibold text-[14px] tracking-wide text-text-primary whitespace-nowrap">Vigilante</span>
+    <div className="flex items-center justify-between px-3 h-10 shrink-0 mb-4 w-full relative" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+      <div className={cn("flex items-center gap-2.5 overflow-hidden", isSidebarCollapsed && "w-0 opacity-0")}>
+        <div className="w-6 h-6 flex items-center justify-center shrink-0">
+          <VigilanteLogo />
+        </div>
+        <span className="text-body-lg text-text-primary whitespace-nowrap mt-0.5">Vigilante</span>
       </div>
+
+      {isSidebarCollapsed && (
+        <div className="absolute left-[20px] top-1/2 -translate-y-1/2 w-6 h-6">
+          <VigilanteLogo />
+        </div>
+      )}
 
       <button 
         onClick={toggleSidebar}
         className={cn(
-          "w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors shrink-0",
-          isSidebarCollapsed && "mx-auto"
+          "w-7 h-7 flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors shrink-0 absolute z-10",
+          isSidebarCollapsed ? "left-[18px] opacity-0 hover:opacity-100" : "right-[12px]"
         )}
         title={isSidebarCollapsed ? "Expand Sidebar (Cmd+B)" : "Collapse Sidebar (Cmd+B)"}
       >

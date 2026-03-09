@@ -16,7 +16,7 @@ export function SidebarFooter({ isSidebarCollapsed, isOnline }: SidebarFooterPro
 
   if (isSidebarCollapsed) {
     return (
-      <div className="flex flex-col gap-2 items-center w-10 mx-auto">
+      <div className="flex flex-col gap-2 items-center w-[64px] mx-0 absolute left-0 bottom-3">
         <IconButton icon={<Activity className="w-[18px] h-[18px]" />} title="Activity" />
         <div className="relative">
           <IconButton 
@@ -63,14 +63,16 @@ function IconButton({ icon, active, onClick, title }: { icon: React.ReactNode; a
 
 function ActionRow({ icon, label, statusDot, onClick }: { icon: React.ReactNode; label: string; statusDot?: string; onClick?: () => void }) {
   return (
-    <button onClick={onClick} className="w-full flex items-center gap-3 px-3 h-10 rounded-xl text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors text-left group">
+    <button onClick={onClick} className="w-full flex items-center gap-3 px-3 h-10 rounded-xl text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors text-left group relative">
       <div className="w-5 flex justify-center relative">
         {icon}
         {statusDot && (
           <div className={cn("absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full", statusDot)} />
         )}
       </div>
-      <span className="text-[13px] font-medium">{label}</span>
+      <span className="text-body-sm">{label}</span>
+      {/* Precision notch for active items */}
+      <div className="absolute top-0 right-0 w-0.5 h-full bg-accent" />
     </button>
   );
 }
