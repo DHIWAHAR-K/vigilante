@@ -4,22 +4,16 @@ import { MoreHorizontal, Edit2, Trash2, Download, Archive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog';
-
-export interface Conversation {
-  id: string;
-  title: string;
-  time?: string;
-  active?: boolean;
-  createdAt: Date;
-}
+import { Conversation as ConversationType } from '@/store/useConversationStore';
 
 interface ConversationItemProps {
-  item: Conversation;
+  item: ConversationType;
   onDelete?: (id: string) => void;
   onSelect?: (id: string) => void;
+  isActive?: boolean;
 }
 
-export function ConversationItem({ item, onDelete, onSelect }: ConversationItemProps) {
+export function ConversationItem({ item, onDelete, onSelect, isActive }: ConversationItemProps) {
   const [isHovered, setIsHovered] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
@@ -43,7 +37,7 @@ export function ConversationItem({ item, onDelete, onSelect }: ConversationItemP
   }, [menuOpen]);
 
   const handleClick = () => {
-    if (onSelect && !item.active) {
+    if (onSelect) {
       onSelect(item.id);
     }
   };
@@ -62,6 +56,22 @@ export function ConversationItem({ item, onDelete, onSelect }: ConversationItemP
 
   const showActions = isHovered || menuOpen;
 
+  const formatTime = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - new Date(date).getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60) return `${diffMinutes}m`;
+    if (diffHours < 24) return `${diffHours}h`;
+    if (diffDays === 1) return '1d';
+    if (diffDays < 7) return `${diffDays}d`;
+    
+    return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
   return (
     <div
       className="relative flex items-center group w-full"
@@ -79,12 +89,12 @@ export function ConversationItem({ item, onDelete, onSelect }: ConversationItemP
         onClick={handleClick}
         className={cn(
           "w-full flex items-center justify-between px-3 h-9 rounded-lg transition-colors text-left relative overflow-hidden",
-          item.active
+          isActive
             ? "bg-bg-elevated text-text-primary font-medium"
             : "text-text-secondary hover:bg-bg-surface hover:text-text-primary"
         )}
       >
-        {item.active && (
+        {isActive && (
           <motion.div
             layoutId="active-indicator"
             className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-accent rounded-r-full"
@@ -96,20 +106,17 @@ export function ConversationItem({ item, onDelete, onSelect }: ConversationItemP
           {item.title}
         </span>
 
-        {/* Precision notch accent for active items */}
-        {item.active && (
+        {isActive && (
           <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-accent" />
         )}
 
-        {/* Timestamp - hidden when actions are showing */}
-        {!showActions && item.time && (
+        {!showActions && (
           <span className="text-mono-xs text-text-muted shrink-0 pl-2" suppressHydrationWarning>
-            {item.time}
+            {formatTime(item.updatedAt)}
           </span>
         )}
       </button>
 
-      {/* Action Menu Trigger - visible on hover or when menu is open */}
       <AnimatePresence>
         {showActions && (
           <motion.div
@@ -139,7 +146,6 @@ export function ConversationItem({ item, onDelete, onSelect }: ConversationItemP
               <MoreHorizontal className="w-3.5 h-3.5" />
             </button>
 
-            {/* Dropdown Menu — portalled to body to escape overflow clipping */}
             {menuOpen && createPortal(
               <div
                 ref={dropdownRef}

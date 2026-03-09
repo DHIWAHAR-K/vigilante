@@ -12,9 +12,10 @@ import { breatheVariants, sendReadyVariants } from '@/lib/motion-config';
 
 interface QueryInputProps {
   onSubmit?: (query: string, context: ContextItem[]) => void;
+  disabled?: boolean;
 }
 
-export function QueryInput({ onSubmit }: QueryInputProps) {
+export function QueryInput({ onSubmit, disabled = false }: QueryInputProps) {
   const setProviderSelectorOpen = useUIStore(s => s.setProviderSelectorOpen);
   const { isSidebarCollapsed, toggleSidebar } = useUIStore();
   
@@ -22,7 +23,7 @@ export function QueryInput({ onSubmit }: QueryInputProps) {
   const [lastQuery, setLastQuery] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [isWebSearch, setIsWebSearch] = useState(false);
-  const [mode, setMode] = useState<'Ask' | 'Research' | 'Deep Research' | 'RAG'>('Ask');
+  const [mode, setMode] = useState<'Ask' | 'Deep Research'>('Ask');
   
   const [contextChips, setContextChips] = useState<ContextItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,7 +46,7 @@ export function QueryInput({ onSubmit }: QueryInputProps) {
 
   const cycleMode = React.useCallback(() => {
     setMode(prev => {
-      const modes: typeof mode[] = ['Ask', 'Research', 'Deep Research', 'RAG'];
+      const modes: typeof mode[] = ['Ask', 'Deep Research'];
       return modes[(modes.indexOf(prev) + 1) % modes.length];
     });
   }, []);
@@ -132,7 +133,7 @@ export function QueryInput({ onSubmit }: QueryInputProps) {
   };
 
   const handleSubmit = () => {
-    if (!isReady) return;
+    if (!isReady || disabled) return;
     
     setIsSubmitting(true);
     if (query.trim()) setLastQuery(query.trim());
@@ -216,8 +217,7 @@ export function QueryInput({ onSubmit }: QueryInputProps) {
           <div className="absolute inset-0 bg-gradient-radial from-accent/5 via-transparent to-transparent opacity-30" />
         </div>
         
-        {/* Precision notch accent */}
-        <div className="absolute top-0 left-0 w-0.5 h-full bg-accent" />
+
         
         {/* Context Chips Zone */}
         <AnimatePresence>
@@ -282,8 +282,7 @@ export function QueryInput({ onSubmit }: QueryInputProps) {
                   {mode}
                 </motion.span>
               </AnimatePresence>
-              {/* Precision notch for mode button */}
-              <div className="absolute top-0 right-0 w-0.5 h-full bg-accent" />
+
             </button>
 
             <div className="w-[1px] h-3 bg-border-strong" />
@@ -315,20 +314,19 @@ export function QueryInput({ onSubmit }: QueryInputProps) {
             >
               <div className="w-1.5 h-1.5 rounded-full bg-success shadow-[0_0_8px_rgba(52,211,153,0.4)]" />
               <span className="text-mono-xs text-accent">llama3.2</span>
-              {/* Precision notch for model selector */}
-              <div className="absolute top-0 right-0 w-0.5 h-full bg-accent" />
+
             </button>
 
             <motion.button 
               variants={sendReadyVariants}
               initial="idle"
-              animate={isReady ? "ready" : "idle"}
+              animate={isReady && !disabled ? "ready" : "idle"}
               whileTap="pressed"
               onClick={(e) => { e.stopPropagation(); handleSubmit(); }}
-              disabled={!isReady}
+              disabled={!isReady || disabled}
               className={cn(
                 "w-9 h-9 flex items-center justify-center rounded-lg transition-colors ml-1 relative z-10",
-                isReady
+                isReady && !disabled
                   ? "bg-accent text-bg-base hover:bg-accent-hover shadow-shadow-glow"
                   : "bg-bg-elevated text-text-muted border border-border-subtle"
               )}

@@ -3,9 +3,11 @@
 import React, { useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { useUIStore } from '@/store/useUIStore';
+import { useConversationStore } from '@/store/useConversationStore';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { isProviderSelectorOpen, setProviderSelectorOpen } = useUIStore();
+  const { startDraftThread } = useConversationStore();
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -17,14 +19,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       // Cmd/Ctrl + Shift + N for New Chat
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'n') {
         e.preventDefault();
-        // In a real implementation, this would reset chat state or navigate home
-        console.log('New chat triggered');
+        startDraftThread();
       }
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [setProviderSelectorOpen]);
+  }, [setProviderSelectorOpen, startDraftThread]);
 
   return (
     <div className="flex h-screen w-full bg-bg-base text-text-primary overflow-hidden">

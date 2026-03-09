@@ -2,6 +2,7 @@ import React from 'react';
 import { Search, MessageSquarePlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/store/useUIStore';
+import { useConversationStore } from '@/store/useConversationStore';
 
 interface SidebarNavProps {
   activeTab: 'chat' | 'search';
@@ -10,23 +11,28 @@ interface SidebarNavProps {
 
 export function SidebarNav({ activeTab, setActiveTab }: SidebarNavProps) {
   const { isSidebarCollapsed } = useUIStore();
+  const { startDraftThread, activeConversationId } = useConversationStore();
+
+  const handleNewChat = () => {
+    startDraftThread();
+    setActiveTab('chat');
+  };
 
   if (isSidebarCollapsed) {
     return (
       <div className="flex flex-col gap-2 w-[64px] items-center mb-4">
         <button 
-          onClick={() => setActiveTab('chat')}
+          onClick={handleNewChat}
           className={cn(
             "w-10 h-10 flex items-center justify-center rounded-xl transition-all relative",
-            activeTab === 'chat' 
+            !activeConversationId
               ? "bg-accent-subtle text-accent" 
               : "text-text-secondary hover:bg-bg-elevated hover:text-text-primary"
           )}
           title="New Chat"
         >
           <MessageSquarePlus className="w-[18px] h-[18px]" />
-          {/* Active indicator for collapsed mode - integrated circle */}
-          {activeTab === 'chat' && (
+          {!activeConversationId && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-1.5 h-1.5 rounded-full bg-accent" />
             </div>
@@ -43,7 +49,6 @@ export function SidebarNav({ activeTab, setActiveTab }: SidebarNavProps) {
           title="Search"
         >
           <Search className="w-[18px] h-[18px]" />
-          {/* Active indicator for collapsed mode - integrated circle */}
           {activeTab === 'search' && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-1.5 h-1.5 rounded-full bg-accent" />
@@ -57,21 +62,21 @@ export function SidebarNav({ activeTab, setActiveTab }: SidebarNavProps) {
   return (
     <div className="flex flex-col gap-1 px-3 mb-6 w-full">
       <button 
-        onClick={() => setActiveTab('chat')}
+        onClick={handleNewChat}
         className={cn(
           "w-full flex items-center gap-3 px-3 h-10 rounded-xl transition-all group relative",
-          activeTab === 'chat' 
+          !activeConversationId 
             ? "bg-accent-subtle text-accent font-medium" 
             : "text-text-secondary hover:bg-bg-elevated hover:text-text-primary"
         )}
       >
-        <MessageSquarePlus className={cn("w-[18px] h-[18px]", activeTab === 'chat' ? "text-accent" : "text-text-muted group-hover:text-text-primary")} />
+        <MessageSquarePlus className={cn("w-[18px] h-[18px]", !activeConversationId ? "text-accent" : "text-text-muted group-hover:text-text-primary")} />
         <span className="text-body-md">Chat</span>
         <span className={cn(
           "ml-auto text-mono-xs opacity-0 group-hover:opacity-100 transition-opacity",
-          activeTab === 'chat' ? "text-accent/70" : "text-text-muted"
+          !activeConversationId ? "text-accent/70" : "text-text-muted"
         )}>⌘N</span>
-        {activeTab === 'chat' && (
+        {!activeConversationId && (
           <div className="absolute top-0 right-0 w-0.5 h-full bg-accent rounded-r-full" />
         )}
       </button>

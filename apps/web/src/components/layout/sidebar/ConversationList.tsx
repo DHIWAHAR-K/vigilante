@@ -2,10 +2,10 @@
 
 import React, { useMemo, useEffect, useState } from 'react';
 import { ConversationGroup } from './ConversationGroup';
-import { type Conversation } from './ConversationItem';
+import { ConversationItem } from './ConversationItem';
 import { useConversationStore } from '@/store/useConversationStore';
 
-function getTimeGroup(conversation: Conversation): string {
+function getTimeGroup(conversation: { createdAt: Date }): string {
   const now = new Date();
   const created = new Date(conversation.createdAt);
   const diffMs = now.getTime() - created.getTime();
@@ -18,67 +18,51 @@ function getTimeGroup(conversation: Conversation): string {
   return 'Older';
 }
 
-function formatTime(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMinutes = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffMinutes < 1) return 'Just now';
-  if (diffMinutes < 60) return `${diffMinutes}m`;
-  if (diffHours < 24) return `${diffHours}h`;
-  if (diffDays === 1) return '1d';
-  if (diffDays < 7) return `${diffDays}d`;
-  
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
 interface ConversationListProps {
   searchQuery: string;
 }
 
 export function ConversationList({ searchQuery }: ConversationListProps) {
-  const { conversations, activeConversationId, deleteConversation, setActiveConversation } = useConversationStore();
+  const { conversations, activeConversationId, deleteConversation, openConversation } = useConversationStore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  const filteredConversations = useMemo(() => {
+    return conversations
+      .filter(c => c.status === 'persisted')
+      .filter(c =>
+        c.title.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+  }, [conversations, searchQuery]);
+
   const groupedConversations = useMemo(() => {
-    const filtered = conversations.filter(c =>
-      c.title.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const groups: Record<string, typeof filteredConversations> = {};
 
-    const groups: Record<string, Conversation[]> = {};
-
-    filtered.forEach(conv => {
+    filteredConversations.forEach(conv => {
       const group = getTimeGroup(conv);
       if (!groups[group]) {
         groups[group] = [];
       }
-      groups[group].push({
-        ...conv,
-        time: mounted ? formatTime(new Date(conv.createdAt)) : (conv.time ?? ''),
-        active: conv.id === activeConversationId
-      });
+      groups[group].push(conv);
     });
 
     return groups;
-  }, [conversations, activeConversationId, searchQuery, mounted]);
+  }, [filteredConversations]);
 
   const handleDelete = (id: string) => {
     deleteConversation(id);
   };
 
   const handleSelect = (id: string) => {
-    setActiveConversation(id);
+    openConversation(id);
   };
 
   const groupOrder = ['Today', 'Yesterday', 'Previous 7 Days', 'Previous 30 Days', 'Older'];
 
-  const hasConversations = Object.keys(groupedConversations).length > 0;
+  const hasConversations = filteredConversations.length > 0;
 
   if (!hasConversations) {
     return (
@@ -103,11 +87,18 @@ export function ConversationList({ searchQuery }: ConversationListProps) {
         return (
           <ConversationGroup 
             key={group} 
-            label={group} 
-            items={items} 
-            onDelete={handleDelete}
-            onSelect={handleSelect}
-          />
+            label={group}
+          >
+            {items.map(conv => (
+              <ConversationItem
+                key={conv.id}
+                item={conv}
+                onDelete={handleDelete}
+                onSelect={handleSelect}
+                isActive={conv.id === activeConversationId}
+              />
+            ))}
+          </ConversationGroup>
         );
       })}
     </div>
