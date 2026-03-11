@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, AlertCircle, Loader2, ExternalLink, Server } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -56,21 +56,13 @@ function DetectionRow({ label, status, value, delay }: DetectionRowProps) {
 }
 
 export function DetectRuntimeStep({ onNext }: DetectRuntimeStepProps) {
-  const { status, checkRuntime, isOllamaInstalled, ollamaVersion, isOnline } = useRuntimeStore();
-  const [isChecking, setIsChecking] = useState(true);
+  const { status, checkRuntime, isOllamaInstalled, ollamaVersion, isOnline, isChecking } = useRuntimeStore();
 
   useEffect(() => {
     checkRuntime();
-  }, []);
-
-  useEffect(() => {
-    if (status !== 'checking') {
-      setIsChecking(false);
-    }
-  }, [status]);
+  }, [checkRuntime]);
 
   const handleCheck = async () => {
-    setIsChecking(true);
     await checkRuntime();
   };
 

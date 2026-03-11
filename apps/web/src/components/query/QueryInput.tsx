@@ -8,6 +8,7 @@ import { ContextItem } from './types';
 import { ContextChip } from './ContextChip';
 import { MentionPicker } from './MentionPicker';
 import { useUIStore } from '@/store/useUIStore';
+import { useRuntimeStore } from '@/store/useRuntimeStore';
 import { breatheVariants, sendReadyVariants } from '@/lib/motion-config';
 
 interface QueryInputProps {
@@ -18,6 +19,7 @@ interface QueryInputProps {
 export function QueryInput({ onSubmit, disabled = false }: QueryInputProps) {
   const setProviderSelectorOpen = useUIStore(s => s.setProviderSelectorOpen);
   const { isSidebarCollapsed, toggleSidebar } = useUIStore();
+  const { selectedModel, status, models } = useRuntimeStore();
   
   const [query, setQuery] = useState('');
   const [lastQuery, setLastQuery] = useState('');
@@ -134,6 +136,7 @@ export function QueryInput({ onSubmit, disabled = false }: QueryInputProps) {
 
   const handleSubmit = () => {
     if (!isReady || disabled) return;
+    if (!selectedModel && models.length === 0) return;
     
     setIsSubmitting(true);
     if (query.trim()) setLastQuery(query.trim());
@@ -312,8 +315,17 @@ export function QueryInput({ onSubmit, disabled = false }: QueryInputProps) {
               className="flex items-center gap-2 px-2.5 h-6 rounded bg-bg-elevated hover:bg-border-subtle transition-colors relative"
               title="Select Model (Cmd+Shift+S)"
             >
-              <div className="w-1.5 h-1.5 rounded-full bg-success shadow-[0_0_8px_rgba(52,211,153,0.4)]" />
-              <span className="text-mono-xs text-accent">llama3.2</span>
+              <div className={cn(
+                "w-1.5 h-1.5 rounded-full",
+                status === 'running' || status === 'available'
+                  ? "bg-success shadow-[0_0_8px_rgba(52,211,153,0.4)]"
+                  : "bg-warning"
+              )} />
+              <span className="text-mono-xs text-accent">
+                {selectedModel 
+                  ? models.find(m => m.id === selectedModel)?.name.split(':')[0] || selectedModel.split(':')[0]
+                  : 'Select Model'}
+              </span>
 
             </button>
 

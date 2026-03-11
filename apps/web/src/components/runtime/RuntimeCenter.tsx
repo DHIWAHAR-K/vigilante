@@ -93,22 +93,23 @@ export function RuntimeCenter({ isOpen, onClose }: RuntimeCenterProps) {
     models, 
     selectedModel, 
     ollamaVersion,
-    selectModel,
-    checkRuntime 
+    selectModel, 
+    checkRuntime,
+    isChecking,
   } = useRuntimeStore();
   
-  const [isChecking, setIsChecking] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    if (isOpen && status === 'checking') {
+    if (isOpen) {
       checkRuntime();
     }
   }, [isOpen]);
 
   const handleCheck = async () => {
-    setIsChecking(true);
+    setIsRefreshing(true);
     await checkRuntime();
-    setIsChecking(false);
+    setIsRefreshing(false);
   };
 
   return (
@@ -182,15 +183,15 @@ export function RuntimeCenter({ isOpen, onClose }: RuntimeCenterProps) {
                   <h3 className="text-body-sm font-medium text-text-primary">Installed Models</h3>
                   <button
                     onClick={handleCheck}
-                    disabled={isChecking}
+                    disabled={isRefreshing}
                     className="flex items-center gap-1.5 text-caption text-accent hover:text-accent-hover transition-colors"
                   >
-                    <RefreshCw className={cn("w-3.5 h-3.5", isChecking && "animate-spin")} />
+                    <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
                     Refresh
                   </button>
                 </div>
                 
-                {status === 'checking' || isChecking ? (
+                {status === 'checking' || isRefreshing ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 text-accent animate-spin" />
                   </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useConversationStore, Message, Source } from '@/store/useConversationStore';
 import { useUIStore } from '@/store/useUIStore';
@@ -22,26 +22,6 @@ function generateTitle(content: string): string {
   return firstLine.length > 50 ? firstLine.substring(0, 47) + '...' : firstLine;
 }
 
-const mockAssistantResponse = `Great question! Here's what you need to know:
-
-**Key Points:**
-
-1. **First consideration** - This is an important factor that impacts how you should approach the problem.
-
-2. **Second point** - Another critical aspect to keep in mind when working through this topic.
-
-3. **Third insight** - This builds on the previous points and provides additional context.
-
-**Conclusion:**
-The answer depends on your specific use case, but generally speaking, you should consider your requirements carefully before making a decision.
-
-Would you like me to elaborate on any of these points?`;
-
-const mockSources: Source[] = [
-  { id: 's1', title: 'React 19 Documentation', url: 'https://react.dev', excerpt: 'Official React documentation with the latest updates on hooks and server components.' },
-  { id: 's2', title: 'Next.js 15 Release Notes', url: 'https://nextjs.org/blog', excerpt: 'Learn about the new features in Next.js 15 including partial prerendering.' },
-];
-
 export function ConversationWorkspace() {
   const { 
     activeConversationId, 
@@ -50,24 +30,80 @@ export function ConversationWorkspace() {
     setDraftInput,
     createConversationFromDraft,
     addMessage,
+    updateAssistantMessage,
   } = useConversationStore();
   
   const { setRuntimeCenterOpen } = useUIStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
+  const [streamingSources, setStreamingSources] = useState<Source[]>([]);
+  const [streamingFollowups, setStreamingFollowups] = useState<string[]>([]);
   const [sourceTrayExpanded, setSourceTrayExpanded] = useState(false);
   const [justSentFirstMessage, setJustSentFirstMessage] = useState(false);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  
+  const streamingMessageIdRef = useRef<string | null>(null);
   
   const activeConversation = conversations.find(c => c.id === activeConversationId);
   const hasMessages = activeConversation?.messages && activeConversation.messages.length > 0;
   const isInConversation = isDraftMode || hasMessages;
-  const { status, isOnline } = useRuntimeStore();
+  const { status, isOnline, selectedModel, checkRuntime } = useRuntimeStore();
+
+  // Initialize runtime on mount
+  useEffect(() => {
+    checkRuntime();
+  }, []);
+
+  const handleToken = useCallback((token: string) => {
+    setStreamingContent(prev => prev + token);
+  }, []);
+
+  const handleSources = useCallback((sources: Source[]) => {
+    setStreamingSources(sources);
+  }, []);
+
+  const handleFollowups = useCallback((questions: string[]) => {
+    setStreamingFollowups(questions);
+  }, []);
+
+  const handleDone = useCallback((messageId: string, tokensUsed: number) => {
+    streamingMessageIdRef.current = messageId;
+  }, []);
+
+  const handleStreamError = useCallback((error: string) => {
+    setStreamError(error);
+  }, []);
+
+  const handleStreamComplete = useCallback(() => {
+    if (streamingMessageIdRef.current && activeConversationId) {
+      const assistantMessage: Message = {
+        id: streamingMessageIdRef.current,
+        role: 'assistant',
+        content: streamingContent,
+        sources: streamingSources.length > 0 ? streamingSources : undefined,
+        createdAt: new Date()
+      };
+      
+      addMessage(activeConversationId, assistantMessage);
+    }
+    
+    setStreamingContent('');
+    setStreamingSources([]);
+    setStreamingFollowups([]);
+    streamingMessageIdRef.current = null;
+    setIsSubmitting(false);
+    setStreamError(null);
+  }, [activeConversationId, streamingContent, streamingSources, addMessage]);
 
   const handleSubmit = useCallback((query: string, context: ContextItem[]) => {
     if (!query.trim() || isSubmitting) return;
     
     const wasDraft = isDraftMode;
     setIsSubmitting(true);
+    setStreamError(null);
+    setStreamingContent('');
+    setStreamingSources([]);
+    setStreamingFollowups([]);
     
     let conversationId = activeConversationId;
     
@@ -87,31 +123,81 @@ export function ConversationWorkspace() {
     
     addMessage(conversationId!, userMessage);
     setDraftInput('');
-    
-    setTimeout(() => {
-      let currentIndex = 0;
-      const responseInterval = setInterval(() => {
-        if (currentIndex < mockAssistantResponse.length) {
-          setStreamingContent(mockAssistantResponse.substring(0, currentIndex + 1));
-          currentIndex += 3;
-        } else {
-          clearInterval(responseInterval);
-          
-          const assistantMessage: Message = {
-            id: generateId(),
-            role: 'assistant',
-            content: mockAssistantResponse,
-            sources: mockSources,
-            createdAt: new Date()
-          };
-          
-          addMessage(conversationId!, assistantMessage);
-          setStreamingContent('');
-          setIsSubmitting(false);
+
+    // Stream from Ollama directly
+    const streamFromOllama = async () => {
+      const model = selectedModel || 'llama3.2';
+      
+      try {
+        const response = await fetch('http://localhost:11434/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model,
+            prompt: `You are a helpful AI assistant. Answer the user's question concisely and accurately.\n\nUser: ${query}\n\nAssistant:`,
+            stream: true,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Ollama error: ${response.status}`);
         }
-      }, 20);
-    }, 300);
-  }, [activeConversationId, isDraftMode, createConversationFromDraft, addMessage, setDraftInput, isSubmitting]);
+
+        if (!response.body) {
+          throw new Error('No response body');
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let messageId = generateId();
+        streamingMessageIdRef.current = messageId;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const parsed = JSON.parse(line);
+              if (parsed.response) {
+                handleToken(parsed.response);
+              }
+              if (parsed.done) {
+                handleDone(messageId, parsed.prompt_eval_count + parsed.eval_count || 0);
+              }
+            } catch {
+              // Skip invalid JSON
+            }
+          }
+        }
+      } catch (error) {
+        handleStreamError(error instanceof Error ? error.message : 'Failed to connect to Ollama');
+      } finally {
+        handleStreamComplete();
+      }
+    };
+
+    // Start streaming with a small delay
+    setTimeout(streamFromOllama, 300);
+  }, [
+    activeConversationId, 
+    isDraftMode, 
+    createConversationFromDraft, 
+    addMessage, 
+    setDraftInput, 
+    isSubmitting,
+    selectedModel,
+    handleToken,
+    handleDone,
+    handleStreamError,
+    handleStreamComplete,
+  ]);
 
   // Close source tray when new message comes in
   useEffect(() => {
@@ -119,6 +205,10 @@ export function ConversationWorkspace() {
       setSourceTrayExpanded(false);
     }
   }, [activeConversation?.messages?.length]);
+
+  // Combine streaming content with existing messages for display
+  const displayMessages = activeConversation?.messages || [];
+  const hasStreamingContent = streamingContent.length > 0 || isSubmitting;
 
   return (
     <div className="flex flex-col h-full w-full relative">
@@ -161,7 +251,7 @@ export function ConversationWorkspace() {
             
             {/* Streaming Response */}
             <AnimatePresence>
-              {(streamingContent || isSubmitting) && (
+              {hasStreamingContent && (
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -187,6 +277,30 @@ export function ConversationWorkspace() {
                         />
                       </p>
                     </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Error Display */}
+            <AnimatePresence>
+              {streamError && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="px-6 py-4 max-w-[900px] mx-auto w-full"
+                >
+                  <div className="p-4 rounded-lg bg-error/10 border border-error/20">
+                    <p className="text-body-sm text-error">
+                      {streamError}
+                    </p>
+                    <button
+                      onClick={() => setStreamError(null)}
+                      className="mt-2 text-caption text-text-muted hover:text-text-primary"
+                    >
+                      Dismiss
+                    </button>
                   </div>
                 </motion.div>
               )}

@@ -20,6 +20,11 @@ export function RuntimeStatusChip({ onClick }: RuntimeStatusChipProps) {
       pulse: true,
       label: 'Checking runtime...' 
     },
+    unknown: { 
+      color: 'bg-yellow-500', 
+      pulse: true,
+      label: 'Checking runtime...' 
+    },
     available: { 
       color: 'bg-success', 
       pulse: true,

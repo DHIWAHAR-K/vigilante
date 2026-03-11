@@ -3,6 +3,7 @@ import { Geist_Mono, Gentium_Book_Plus } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/layout/AppShell";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { RuntimeProvider } from "@/components/providers/RuntimeProvider";
 
 const gentium = Gentium_Book_Plus({
   weight: ["400", "700"],
@@ -34,9 +35,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AppShell>
-            {children}
-          </AppShell>
+          <RuntimeProvider>
+            <AppShell>
+              {children}
+            </AppShell>
+          </RuntimeProvider>
         </ThemeProvider>
       </body>
     </html>

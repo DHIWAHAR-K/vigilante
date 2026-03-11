@@ -1,0 +1,25 @@
+node_modules/
+
+# Build outputs
+dist/
+.next/
+out/
+
+# SQLite database files (generated at runtime)
+*.db
+*.db-shm
+*.db-wal
+
+# Environment (never commit secrets)
+.env
+.env.local
+
+# Turbo cache
+.turbo/
+
+# macOS
+.DS_Store
+
+# Editor
+.idea/
+*.swp

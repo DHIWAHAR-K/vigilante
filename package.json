@@ -1,0 +1,19 @@
+{
+  "name": "vigilante",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev:orchestrator": "pnpm --filter @vigilante/orchestrator dev",
+    "dev:web": "pnpm --filter web dev",
+    "dev": "pnpm run dev:orchestrator & pnpm run dev:web",
+    "build": "turbo build",
+    "typecheck": "turbo typecheck"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.8.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["better-sqlite3", "esbuild"]
+  }
+}
