@@ -8,6 +8,10 @@ import { ConversationThread } from './ConversationThread';
 import { QueryInput } from '@/components/query/QueryInput';
 import { ContextItem } from '@/components/query/types';
 import { HomeIntro } from '@/components/layout/HomeIntro';
+import { SourceTray } from '@/components/sources/SourceTray';
+import { RuntimeStatusChip } from '@/components/runtime/RuntimeStatusChip';
+import { useRuntimeStore } from '@/store/useRuntimeStore';
+import { conversationStateVariants, TRANSITIONS } from '@/lib/motion-config';
 
 function generateId() {
   return Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
@@ -42,36 +46,36 @@ export function ConversationWorkspace() {
   const { 
     activeConversationId, 
     conversations, 
-    draftInput,
+    isDraftMode,
     setDraftInput,
     createConversationFromDraft,
     addMessage,
-    openConversation,
-    startDraftThread,
-    clearDraft
   } = useConversationStore();
   
-  const { isSidebarCollapsed, toggleSidebar } = useUIStore();
-  
+  const { setRuntimeCenterOpen } = useUIStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
+  const [sourceTrayExpanded, setSourceTrayExpanded] = useState(false);
+  const [justSentFirstMessage, setJustSentFirstMessage] = useState(false);
   
   const activeConversation = conversations.find(c => c.id === activeConversationId);
-  const isDraft = !activeConversationId;
   const hasMessages = activeConversation?.messages && activeConversation.messages.length > 0;
-  const isInConversation = isDraft || hasMessages;
+  const isInConversation = isDraftMode || hasMessages;
+  const { status, isOnline } = useRuntimeStore();
 
   const handleSubmit = useCallback((query: string, context: ContextItem[]) => {
     if (!query.trim() || isSubmitting) return;
     
+    const wasDraft = isDraftMode;
     setIsSubmitting(true);
     
     let conversationId = activeConversationId;
-    let conversation = activeConversation;
     
-    if (isDraft) {
-      conversation = createConversationFromDraft(generateTitle(query));
-      conversationId = conversation.id;
+    if (wasDraft) {
+      const newConv = createConversationFromDraft(generateTitle(query));
+      conversationId = newConv.id;
+      setJustSentFirstMessage(true);
+      setTimeout(() => setJustSentFirstMessage(false), 600);
     }
     
     const userMessage: Message = {
@@ -107,60 +111,97 @@ export function ConversationWorkspace() {
         }
       }, 20);
     }, 300);
-  }, [activeConversationId, activeConversation, isDraft, createConversationFromDraft, addMessage, setDraftInput, isSubmitting]);
+  }, [activeConversationId, isDraftMode, createConversationFromDraft, addMessage, setDraftInput, isSubmitting]);
 
+  // Close source tray when new message comes in
   useEffect(() => {
-    if (streamingContent && activeConversationId) {
-      const tempMessage: Message = {
-        id: 'streaming',
-        role: 'assistant',
-        content: streamingContent,
-        createdAt: new Date()
-      };
+    if (activeConversation?.messages && activeConversation.messages.length > 0) {
+      setSourceTrayExpanded(false);
     }
-  }, [streamingContent, activeConversationId]);
+  }, [activeConversation?.messages?.length]);
 
   return (
     <div className="flex flex-col h-full w-full relative">
+      {/* Runtime Status Header */}
+      <div className="flex items-center justify-between px-6 pt-4 pb-2">
+        <div className="flex items-center gap-3">
+          {isInConversation && activeConversation && (
+            <motion.div
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex items-center gap-2"
+            >
+              <h2 className="text-body-sm font-medium text-text-primary truncate max-w-[300px]">
+                {activeConversation.title}
+              </h2>
+              <span className="text-caption text-text-muted">
+                {activeConversation.messages.length} message{activeConversation.messages.length !== 1 ? 's' : ''}
+              </span>
+            </motion.div>
+          )}
+        </div>
+        
+            <RuntimeStatusChip onClick={() => setRuntimeCenterOpen(true)} />
+      </div>
+
       <AnimatePresence mode="wait">
         {isInConversation ? (
           <motion.div
             key="conversation"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="flex flex-col h-full"
+            variants={conversationStateVariants}
+            initial="empty"
+            animate={justSentFirstMessage ? "draft" : "active"}
+            transition={TRANSITIONS.smooth}
+            className="flex flex-col flex-1 overflow-hidden"
           >
             <ConversationThread 
               conversation={activeConversation || null} 
-              isDraft={isDraft}
+              isDraft={isDraftMode}
             />
             
-            {(streamingContent || isSubmitting) && (
-              <div className="px-6 py-4 max-w-[900px] mx-auto w-full">
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center shrink-0">
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                      className="w-4 h-4 border-2 border-bg-base border-t-transparent rounded-full"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-body-md text-text-primary whitespace-pre-wrap">
-                      {streamingContent}
-                      <motion.span
-                        animate={{ opacity: [0, 1, 0] }}
-                        transition={{ duration: 0.8, repeat: Infinity }}
-                        className="inline-block w-0.5 h-4 bg-accent ml-0.5 align-middle"
+            {/* Streaming Response */}
+            <AnimatePresence>
+              {(streamingContent || isSubmitting) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
+                  className="px-6 py-4 max-w-[900px] mx-auto w-full"
+                >
+                  <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center shrink-0">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                        className="w-4 h-4 border-2 border-bg-base border-t-transparent rounded-full"
                       />
-                    </p>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-body-md text-text-primary whitespace-pre-wrap leading-relaxed">
+                        {streamingContent}
+                        <motion.span
+                          animate={{ opacity: [0, 1, 0] }}
+                          transition={{ duration: 0.8, repeat: Infinity }}
+                          className="inline-block w-0.5 h-4 bg-accent ml-0.5 align-middle"
+                        />
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Source Tray */}
+            {activeConversation?.messages && activeConversation.messages.some(m => m.sources) && (
+              <SourceTray 
+                sources={activeConversation.messages.flatMap(m => m.sources || [])}
+                isExpanded={sourceTrayExpanded}
+                onToggle={() => setSourceTrayExpanded(!sourceTrayExpanded)}
+              />
             )}
             
+            {/* Composer */}
             <div className="absolute bottom-0 left-0 right-0 pb-6 pt-4 bg-gradient-to-t from-bg-base via-bg-base to-transparent">
               <div className="max-w-[760px] mx-auto w-full px-6">
                 <QueryInput 
@@ -176,9 +217,10 @@ export function ConversationWorkspace() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={TRANSITIONS.standard}
             className="flex flex-col items-center min-h-full w-full relative"
           >
+            {/* Ambient Background */}
             <div className="absolute inset-0 rounded-xl pointer-events-none overflow-hidden">
               <div className="absolute inset-0 bg-gradient-radial from-accent/5 via-transparent to-transparent opacity-30" />
             </div>

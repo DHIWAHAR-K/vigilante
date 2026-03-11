@@ -33,6 +33,7 @@ interface ConversationState {
   conversations: Conversation[];
   activeConversationId: string | null;
   draftInput: string;
+  isDraftMode: boolean;
   
   startDraftThread: () => void;
   setDraftInput: (input: string) => void;
@@ -53,73 +54,30 @@ interface ConversationState {
 
 const generateId = () => Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
 
-const initialConversations: Conversation[] = [
-  { 
-    id: '1', 
-    status: 'persisted',
-    title: 'React 19 vs Next.js 15 routing', 
-    messages: [
-      { id: 'm1', role: 'user', content: 'What are the key differences between React 19 and Next.js 15 routing?', createdAt: new Date(Date.now() - 10 * 60 * 1000) },
-      { id: 'm2', role: 'assistant', content: 'React 19 and Next.js 15 have some overlapping features but serve different purposes:\n\n**React 19** is a library focused on UI updates:\n- Uses the new React Compiler for automatic memoization\n- Actions for handling form submissions\n- use() hook for reading promises/resources\n- Improved server components support\n\n**Next.js 15** is a full framework built on React:\n- File-based routing with App Router\n- Server Actions built on React 19 actions\n- Streaming and Suspense improvements\n- Partial prerendering capabilities\n\nThe main difference is that React 19 is the underlying library, while Next.js 15 uses React 19 to power its framework features.', createdAt: new Date(Date.now() - 9 * 60 * 1000) }
-    ],
-    createdAt: new Date(Date.now() - 10 * 60 * 1000), 
-    updatedAt: new Date(Date.now() - 9 * 60 * 1000) 
-  },
-  { 
-    id: '2', 
-    status: 'persisted',
-    title: 'Implementing RAG with local Llama 3', 
-    messages: [
-      { id: 'm3', role: 'user', content: 'How do I implement RAG using Llama 3 locally?', createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000) }
-    ],
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), 
-    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000) 
-  },
-  { 
-    id: '3', 
-    status: 'persisted',
-    title: 'Framer Motion layout animations', 
-    messages: [],
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000), 
-    updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000) 
-  },
-  { 
-    id: '4', 
-    status: 'persisted',
-    title: 'Tailwind CSS vs CSS Modules', 
-    messages: [],
-    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), 
-    updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) 
-  },
-  { 
-    id: '5', 
-    status: 'persisted',
-    title: 'Zustand state persistence', 
-    messages: [],
-    createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), 
-    updatedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000) 
-  },
-];
+const initialConversations: Conversation[] = [];
 
 export const useConversationStore = create<ConversationState>()(
   persist(
     (set, get) => ({
       conversations: initialConversations,
-      activeConversationId: '1',
+      activeConversationId: null,
       draftInput: '',
+      isDraftMode: false,
 
       startDraftThread: () => set({ 
         activeConversationId: null,
-        draftInput: ''
+        draftInput: '',
+        isDraftMode: true
       }),
 
       setDraftInput: (input) => set({ draftInput: input }),
 
-      clearDraft: () => set({ draftInput: '' }),
+      clearDraft: () => set({ draftInput: '', isDraftMode: false }),
 
       openConversation: (id) => set({ 
         activeConversationId: id,
-        draftInput: ''
+        draftInput: '',
+        isDraftMode: false
       }),
 
       createConversationFromDraft: (title) => {
@@ -209,7 +167,8 @@ export const useConversationStore = create<ConversationState>()(
       partialize: (state) => ({
         conversations: state.conversations,
         activeConversationId: state.activeConversationId,
-        draftInput: state.draftInput
+        draftInput: state.draftInput,
+        isDraftMode: state.isDraftMode
       })
     }
   )

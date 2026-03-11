@@ -1,31 +1,59 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { useUIStore } from '@/store/useUIStore';
 import { useConversationStore } from '@/store/useConversationStore';
+import { useOnboardingStore } from '@/store/useOnboardingStore';
+import { useRuntimeStore } from '@/store/useRuntimeStore';
+import { RuntimeCenter } from '@/components/runtime/RuntimeCenter';
+import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
+import { CommandPalette } from '@/components/command/CommandPalette';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { isProviderSelectorOpen, setProviderSelectorOpen } = useUIStore();
+  const { isProviderSelectorOpen, setProviderSelectorOpen, isRuntimeCenterOpen, setRuntimeCenterOpen } = useUIStore();
   const { startDraftThread } = useConversationStore();
+  const { hasCompletedOnboarding, setOnboardingComplete } = useOnboardingStore();
+  const { checkRuntime } = useRuntimeStore();
+  
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+
+  // Check onboarding on mount
+  useEffect(() => {
+    if (!hasCompletedOnboarding) {
+      setIsOnboardingOpen(true);
+    }
+    // Check runtime status on mount
+    checkRuntime();
+  }, []);
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Cmd/Ctrl + Shift + S for Provider Selector
+      // Cmd/Ctrl + Shift + S for Provider Selector / Runtime Center
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        setProviderSelectorOpen(true);
+        setRuntimeCenterOpen(true);
       }
       // Cmd/Ctrl + Shift + N for New Chat
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         startDraftThread();
       }
+      // Cmd/Ctrl + K for Command Palette
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        // Command palette is opened via ConversationWorkspace for now
+      }
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [setProviderSelectorOpen, startDraftThread]);
+  }, [startDraftThread, setRuntimeCenterOpen]);
+
+  const handleOnboardingComplete = () => {
+    setOnboardingComplete(true);
+    setIsOnboardingOpen(false);
+  };
 
   return (
     <div className="flex h-screen w-full bg-bg-base text-text-primary overflow-hidden">
@@ -39,21 +67,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {/* Provider Selector Modal Placeholder */}
-      {isProviderSelectorOpen && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-bg-surface border border-border-strong rounded-xl p-6 shadow-2xl w-full max-w-[400px] m-4">
-            <h3 className="text-body-lg text-text-primary font-medium mb-2">Select Model Provider</h3>
-            <p className="text-text-muted text-body-sm mb-6">Provider and local model configuration will go here.</p>
-            <button 
-              onClick={() => setProviderSelectorOpen(false)}
-              className="w-full py-2.5 rounded-lg bg-bg-elevated hover:bg-border-subtle text-body-sm transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Runtime Center */}
+      <RuntimeCenter 
+        isOpen={isRuntimeCenterOpen} 
+        onClose={() => setRuntimeCenterOpen(false)} 
+      />
+
+      {/* Onboarding Flow */}
+      <OnboardingFlow 
+        isOpen={isOnboardingOpen} 
+        onComplete={handleOnboardingComplete}
+      />
+
+      {/* Command Palette */}
+      <CommandPalette 
+        isOpen={false}
+        onClose={() => {}}
+        onOpenRuntime={() => setRuntimeCenterOpen(true)}
+        onOpenOnboarding={() => setIsOnboardingOpen(true)}
+      />
     </div>
   );
 }

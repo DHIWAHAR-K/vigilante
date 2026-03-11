@@ -1,0 +1,97 @@
+pub mod commands;
+pub mod error;
+pub mod models;
+pub mod services;
+pub mod state;
+pub mod storage;
+
+use services::storage_service::init_storage;
+use state::AppState;
+use storage::paths::StoragePaths;
+
+/// Build and run the Tauri application.
+///
+/// This function is the single entry point shared by `main.rs` (desktop) and
+/// any future mobile targets.
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        // ── Plugins ─────────────────────────────────────────────────────────
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
+        // ── Global state ─────────────────────────────────────────────────────
+        .setup(|app| {
+            // Initialise tracing.
+            tracing_subscriber::fmt()
+                .with_env_filter(
+                    tracing_subscriber::EnvFilter::try_from_default_env()
+                        .unwrap_or_else(|_| "vigilante=info".into()),
+                )
+                .init();
+
+            // Resolve the OS-native app local data directory.
+            let base = app
+                .path()
+                .app_local_data_dir()
+                .expect("Failed to resolve app local data directory");
+
+            tracing::info!(base = %base.display(), "Vigilante data directory");
+
+            let paths = StoragePaths::new(base);
+
+            // Run directory creation + schema migrations.
+            let thread_index = init_storage(&paths)
+                .expect("Failed to initialise local storage");
+
+            // Log app start event (best-effort — don't block startup).
+            let _ = services::activity_service::log_app_started(
+                &paths,
+                storage::migrations::CURRENT_SCHEMA_VERSION,
+            );
+
+            // Register AppState as managed Tauri state.
+            app.manage(AppState::new(paths, thread_index));
+
+            Ok(())
+        })
+        // ── Commands ─────────────────────────────────────────────────────────
+        .invoke_handler(tauri::generate_handler![
+            // storage
+            commands::storage::get_storage_path,
+            commands::storage::get_storage_info_cmd,
+            // settings
+            commands::settings::get_settings,
+            commands::settings::update_settings,
+            commands::settings::get_runtime_config,
+            commands::settings::update_runtime_config,
+            // threads
+            commands::threads::list_threads,
+            commands::threads::list_archived_threads,
+            commands::threads::open_thread_cmd,
+            commands::threads::rename_thread_cmd,
+            commands::threads::archive_thread_cmd,
+            commands::threads::unarchive_thread_cmd,
+            commands::threads::delete_thread_cmd,
+            // drafts
+            commands::drafts::create_draft_cmd,
+            commands::drafts::save_draft_cmd,
+            commands::drafts::discard_draft_cmd,
+            commands::drafts::promote_draft_cmd,
+            // messages
+            commands::messages::add_message_cmd,
+            commands::messages::update_message_content_cmd,
+            // runtime
+            commands::runtime::check_runtime,
+            commands::runtime::get_cached_runtime_status,
+            commands::runtime::list_models,
+            // activity + export
+            commands::activity::list_activity,
+            commands::activity::export_thread_cmd,
+        ])
+        .run(tauri::generate_context!())
+        .expect("Error while running Vigilante");
+}
