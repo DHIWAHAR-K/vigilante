@@ -31,6 +31,9 @@ queryRoutes.post('/query', async (c) => {
 
   const { query, conversationId, mode = 'ask', provider: providerSpec } = body
 
+  // Log incoming request for debugging (conversationId helps trace streams)
+  console.info('[query] request', { conversationId, mode, queryLength: query?.length ?? 0 })
+
   if (!query || typeof query !== 'string' || !query.trim()) {
     return c.json({ error: '`query` is required and must be a non-empty string' }, 400)
   }
@@ -88,7 +91,11 @@ queryRoutes.post('/query', async (c) => {
       }
     } catch (err) {
       // Surface errors to the client as a structured SSE event
-      const message = err instanceof Error ? err.message : String(err)
+      let message = err instanceof Error ? err.message : String(err)
+      // Unwrap Node.js fetch "fetch failed" to expose the actual cause
+      if (message === 'fetch failed' && err instanceof Error && err.cause instanceof Error) {
+        message = err.cause.message
+      }
       console.error('[query] pipeline error:', err)
       await writeEvent('error', { message })
     }
