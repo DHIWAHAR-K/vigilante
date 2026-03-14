@@ -5,6 +5,7 @@ import { Activity, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import { useRouter, usePathname } from 'next/navigation';
+import { useConversationStore } from '@/store/useConversationStore';
 
 interface SidebarFooterProps {
   isSidebarCollapsed: boolean;
@@ -14,11 +15,12 @@ interface SidebarFooterProps {
 export function SidebarFooter({ isSidebarCollapsed, isOnline }: SidebarFooterProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const { startDraftThread } = useConversationStore();
 
   if (isSidebarCollapsed) {
     return (
       <div className="flex flex-col gap-2 items-center w-[64px] mx-0 absolute left-0 bottom-3">
-        <IconButton icon={<Activity className="w-[18px] h-[18px]" />} title="Activity" onClick={() => router.push('/')} />
+        <IconButton icon={<Activity className="w-[18px] h-[18px]" />} title="Activity" onClick={() => { startDraftThread(); router.push('/'); }} />
         <div className="relative">
           <IconButton 
             icon={<Settings className="w-[18px] h-[18px]" />} 
@@ -37,7 +39,7 @@ export function SidebarFooter({ isSidebarCollapsed, isOnline }: SidebarFooterPro
 
   return (
     <div className="flex flex-col gap-1 w-full px-1">
-      <ActionRow icon={<Activity className="w-4 h-4" />} label="Activity" isActive={pathname === '/'} onClick={() => router.push('/')} />
+      <ActionRow icon={<Activity className="w-4 h-4" />} label="Activity" isActive={pathname === '/'} onClick={() => { startDraftThread(); router.push('/'); }} />
       <ActionRow 
         icon={<Settings className="w-4 h-4" />} 
         label="Settings" 

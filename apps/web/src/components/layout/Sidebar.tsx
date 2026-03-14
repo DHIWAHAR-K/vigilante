@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/store/useUIStore';
+import { usePathname } from 'next/navigation';
 
 // Subcomponents
 import { SidebarHeader } from './sidebar/SidebarHeader';
@@ -14,10 +15,13 @@ import { SidebarFooter } from './SidebarFooter'; // existing
 
 export function Sidebar() {
   const { isSidebarCollapsed, toggleSidebar } = useUIStore();
+  const pathname = usePathname();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'chat' | 'search'>('chat');
   const [isOnline, setIsOnline] = useState(true);
+  
+  const derivedActiveTab = pathname === '/' ? 'chat' : activeTab;
 
   // Handle Cmd/Ctrl + B & Online status
   useEffect(() => {
@@ -59,7 +63,7 @@ export function Sidebar() {
       <div className="flex flex-col flex-1 h-full w-[260px] pt-6">
         <SidebarHeader />
         
-        <SidebarNav activeTab={activeTab} setActiveTab={setActiveTab} />
+        <SidebarNav activeTab={derivedActiveTab} setActiveTab={setActiveTab} />
         
         {!isSidebarCollapsed && (
           <>
