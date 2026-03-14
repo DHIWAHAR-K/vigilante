@@ -13,21 +13,32 @@ interface SidebarNavProps {
 export function SidebarNav({ activeTab, setActiveTab }: SidebarNavProps) {
   const router = useRouter();
   const { isSidebarCollapsed } = useUIStore();
-  const { startDraftThread, activeConversationId } = useConversationStore();
+  const { createConversationFromDraft, openConversation, activeConversationId } = useConversationStore();
 
-  const handleNewChat = () => {
-    startDraftThread();
+  const handleNewChat = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Create a new conversation directly
+    const newConv = createConversationFromDraft('New Chat');
+    openConversation(newConv.id);
     setActiveTab('chat');
-    router.push('/');
+    // Navigate to home
+    if (window.location.pathname === '/') {
+      // Already on home, just refresh
+      window.location.reload();
+    } else {
+      window.location.replace('/');
+    }
   };
 
   if (isSidebarCollapsed) {
     return (
-      <div className="flex flex-col gap-2 w-[64px] items-center mb-4">
+      <div className="flex flex-col gap-2 w-[64px] items-center mb-4 pointer-events-auto">
         <button 
           onClick={handleNewChat}
+          data-testid="chat-button"
           className={cn(
-            "w-10 h-10 flex items-center justify-center rounded-xl transition-all relative",
+            "w-10 h-10 flex items-center justify-center rounded-xl transition-all relative cursor-pointer",
             !activeConversationId
               ? "bg-accent-subtle text-accent" 
               : "text-text-secondary hover:bg-bg-elevated hover:text-text-primary"
@@ -63,11 +74,12 @@ export function SidebarNav({ activeTab, setActiveTab }: SidebarNavProps) {
   }
 
   return (
-    <div className="flex flex-col gap-1 px-3 mb-6 w-full">
+    <div className="flex flex-col gap-1 px-3 mb-6 w-full pointer-events-auto">
       <button 
         onClick={handleNewChat}
+        data-testid="chat-button"
         className={cn(
-          "w-full flex items-center gap-3 px-3 h-10 rounded-xl transition-all group relative",
+          "w-full flex items-center gap-3 px-3 h-10 rounded-xl transition-all group relative cursor-pointer",
           !activeConversationId 
             ? "bg-accent-subtle text-accent font-medium" 
             : "text-text-secondary hover:bg-bg-elevated hover:text-text-primary"

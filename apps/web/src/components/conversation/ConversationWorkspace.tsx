@@ -42,9 +42,13 @@ export function ConversationWorkspace() {
   // Keep a ref to accumulate content so handleStreamComplete always sees full content
   const streamingContentRef = useRef('');
 
+  // Show conversation view only when there are actual messages in an active conversation
+  // Otherwise always show the home/query interface
   const activeConversation = conversations.find(c => c.id === activeConversationId);
   const hasMessages = activeConversation?.messages && activeConversation.messages.length > 0;
-  const isInConversation = !!hasMessages;
+  // Show conversation only when there's an active conversation WITH messages
+  const showConversation = hasMessages && activeConversationId !== null;
+  const hasActiveConversation = activeConversationId !== null;
   const { status, selectedModel, checkRuntime } = useRuntimeStore();
 
   // Initialize runtime on mount
@@ -164,7 +168,7 @@ export function ConversationWorkspace() {
       {/* Runtime Status Header */}
       <div className="flex items-center justify-between px-6 pt-4 pb-2">
         <div className="flex items-center gap-3">
-          {isInConversation && activeConversation && (
+          {showConversation && activeConversation && (
             <motion.div
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
@@ -184,7 +188,7 @@ export function ConversationWorkspace() {
       </div>
 
       <AnimatePresence mode="wait">
-        {isInConversation ? (
+        {hasActiveConversation ? (
           <motion.div
             key="conversation"
             variants={conversationStateVariants}

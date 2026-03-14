@@ -15,12 +15,24 @@ interface SidebarFooterProps {
 export function SidebarFooter({ isSidebarCollapsed, isOnline }: SidebarFooterProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { startDraftThread } = useConversationStore();
+  const { createConversationFromDraft, openConversation } = useConversationStore();
+
+  const handleActivityClick = () => {
+    // Create a new conversation directly
+    const newConv = createConversationFromDraft('New Chat');
+    openConversation(newConv.id);
+    // Navigate to home
+    if (window.location.pathname === '/') {
+      window.location.reload();
+    } else {
+      window.location.replace('/');
+    }
+  };
 
   if (isSidebarCollapsed) {
     return (
       <div className="flex flex-col gap-2 items-center w-[64px] mx-0 absolute left-0 bottom-3">
-        <IconButton icon={<Activity className="w-[18px] h-[18px]" />} title="Activity" onClick={() => { startDraftThread(); router.push('/'); }} />
+        <IconButton icon={<Activity className="w-[18px] h-[18px]" />} title="Activity" onClick={handleActivityClick} />
         <div className="relative">
           <IconButton 
             icon={<Settings className="w-[18px] h-[18px]" />} 
@@ -39,7 +51,7 @@ export function SidebarFooter({ isSidebarCollapsed, isOnline }: SidebarFooterPro
 
   return (
     <div className="flex flex-col gap-1 w-full px-1">
-      <ActionRow icon={<Activity className="w-4 h-4" />} label="Activity" isActive={pathname === '/'} onClick={() => { startDraftThread(); router.push('/'); }} />
+      <ActionRow icon={<Activity className="w-4 h-4" />} label="Activity" isActive={pathname === '/'} onClick={handleActivityClick} />
       <ActionRow 
         icon={<Settings className="w-4 h-4" />} 
         label="Settings" 
@@ -55,7 +67,7 @@ export function SidebarFooter({ isSidebarCollapsed, isOnline }: SidebarFooterPro
 function IconButton({ icon, active, onClick, title }: { icon: React.ReactNode; active?: boolean; onClick?: () => void; title?: string }) {
   return (
     <button onClick={onClick} title={title} className={cn(
-      "w-10 h-10 flex items-center justify-center rounded-xl transition-colors",
+      "w-10 h-10 flex items-center justify-center rounded-xl transition-colors cursor-pointer pointer-events-auto",
       active 
         ? "bg-bg-elevated text-text-primary" 
         : "text-text-muted hover:text-text-primary hover:bg-bg-elevated"
@@ -67,7 +79,7 @@ function IconButton({ icon, active, onClick, title }: { icon: React.ReactNode; a
 
 function ActionRow({ icon, label, statusDot, isActive, onClick }: { icon: React.ReactNode; label: string; statusDot?: string; isActive?: boolean; onClick?: () => void }) {
   return (
-    <button onClick={onClick} className="w-full flex items-center gap-3 px-3 h-10 rounded-xl text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors text-left group relative">
+    <button onClick={onClick} className="w-full flex items-center gap-3 px-3 h-10 rounded-xl text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors text-left group relative cursor-pointer pointer-events-auto">
       <div className="w-5 flex justify-center relative">
         {icon}
         {statusDot && (
