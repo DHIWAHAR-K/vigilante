@@ -168,7 +168,7 @@ export const useConversationStore = create<ConversationState>()(
         conversations: state.conversations,
         activeConversationId: state.activeConversationId,
         draftInput: state.draftInput,
-        isDraftMode: state.isDraftMode
+        // isDraftMode is intentionally excluded — must always reset to false on load
       })
     }
   )

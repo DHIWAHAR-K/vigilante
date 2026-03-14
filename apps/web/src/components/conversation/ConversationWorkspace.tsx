@@ -44,7 +44,7 @@ export function ConversationWorkspace() {
 
   const activeConversation = conversations.find(c => c.id === activeConversationId);
   const hasMessages = activeConversation?.messages && activeConversation.messages.length > 0;
-  const isInConversation = isDraftMode || hasMessages;
+  const isInConversation = !!hasMessages;
   const { status, selectedModel, checkRuntime } = useRuntimeStore();
 
   // Initialize runtime on mount
