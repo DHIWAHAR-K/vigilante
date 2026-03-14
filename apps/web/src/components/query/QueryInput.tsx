@@ -317,7 +317,7 @@ export function QueryInput({ onSubmit, disabled = false }: QueryInputProps) {
             >
               <div className={cn(
                 "w-1.5 h-1.5 rounded-full",
-                status === 'running' || status === 'available'
+                status === 'running'
                   ? "bg-success shadow-[0_0_8px_rgba(52,211,153,0.4)]"
                   : "bg-warning"
               )} />

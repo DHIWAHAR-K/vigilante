@@ -1,5 +1,6 @@
 import React from 'react';
 import { Search, MessageSquarePlus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/store/useUIStore';
 import { useConversationStore } from '@/store/useConversationStore';
@@ -10,12 +11,14 @@ interface SidebarNavProps {
 }
 
 export function SidebarNav({ activeTab, setActiveTab }: SidebarNavProps) {
+  const router = useRouter();
   const { isSidebarCollapsed } = useUIStore();
   const { startDraftThread, activeConversationId } = useConversationStore();
 
   const handleNewChat = () => {
     startDraftThread();
     setActiveTab('chat');
+    router.push('/');
   };
 
   if (isSidebarCollapsed) {

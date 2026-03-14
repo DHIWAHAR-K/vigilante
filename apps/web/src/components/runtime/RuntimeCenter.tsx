@@ -30,7 +30,7 @@ function ModelCard({ model, isSelected, onSelect }: { model: ModelInfo; isSelect
       )}>
         <Cpu className={cn("w-4 h-4", isSelected ? "text-bg-base" : "text-text-muted")} />
       </div>
-      
+
       <div className="flex-1 text-left">
         <p className={cn(
           "text-body-sm font-medium",
@@ -40,7 +40,7 @@ function ModelCard({ model, isSelected, onSelect }: { model: ModelInfo; isSelect
         </p>
         <p className="text-caption text-text-muted">{model.size}</p>
       </div>
-      
+
       {isSelected && (
         <motion.div
           initial={{ scale: 0 }}
@@ -54,15 +54,15 @@ function ModelCard({ model, isSelected, onSelect }: { model: ModelInfo; isSelect
   );
 }
 
-function StatusSection({ 
-  icon: Icon, 
-  label, 
-  value, 
-  status 
-}: { 
-  icon: React.ElementType; 
-  label: string; 
-  value: string; 
+function StatusSection({
+  icon: Icon,
+  label,
+  value,
+  status,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
   status?: 'success' | 'warning' | 'error';
 }) {
   const statusStyles = {
@@ -70,7 +70,7 @@ function StatusSection({
     warning: 'text-warning',
     error: 'text-error',
   };
-  
+
   return (
     <div className="flex items-center gap-3">
       <div className="w-8 h-8 rounded-lg bg-bg-elevated flex items-center justify-center">
@@ -87,17 +87,16 @@ function StatusSection({
 }
 
 export function RuntimeCenter({ isOpen, onClose }: RuntimeCenterProps) {
-  const { 
-    status, 
-    isOnline, 
-    models, 
-    selectedModel, 
-    ollamaVersion,
-    selectModel, 
+  const {
+    status,
+    isOnline,
+    models,
+    selectedModel,
+    selectModel,
     checkRuntime,
     isChecking,
   } = useRuntimeStore();
-  
+
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
@@ -112,6 +111,8 @@ export function RuntimeCenter({ isOpen, onClose }: RuntimeCenterProps) {
     setIsRefreshing(false);
   };
 
+  const isRunning = status === 'running';
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -125,7 +126,7 @@ export function RuntimeCenter({ isOpen, onClose }: RuntimeCenterProps) {
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
             onClick={onClose}
           />
-          
+
           {/* Sheet */}
           <motion.div
             variants={slideInVariants}
@@ -152,23 +153,23 @@ export function RuntimeCenter({ isOpen, onClose }: RuntimeCenterProps) {
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-5 space-y-6">
               {/* Status Cards */}
-              <motion.div 
+              <motion.div
                 variants={staggerContainer}
                 initial="hidden"
                 animate="visible"
                 className="grid grid-cols-2 gap-3"
               >
                 <motion.div variants={listItemVariants} className="p-4 rounded-lg bg-bg-elevated border border-border-subtle">
-                  <StatusSection 
+                  <StatusSection
                     icon={Cpu}
                     label="Ollama"
-                    value={status === 'not-installed' ? 'Not installed' : ollamaVersion || 'Available'}
-                    status={status === 'running' ? 'success' : status === 'not-installed' ? 'error' : 'warning'}
+                    value={isRunning ? 'Running' : status === 'stopped' ? 'Stopped' : status === 'error' ? 'Error' : 'Checking…'}
+                    status={isRunning ? 'success' : status === 'error' ? 'error' : 'warning'}
                   />
                 </motion.div>
-                
+
                 <motion.div variants={listItemVariants} className="p-4 rounded-lg bg-bg-elevated border border-border-subtle">
-                  <StatusSection 
+                  <StatusSection
                     icon={isOnline ? CheckCircle2 : AlertCircle}
                     label="Network"
                     value={isOnline ? 'Online' : 'Offline'}
@@ -190,27 +191,28 @@ export function RuntimeCenter({ isOpen, onClose }: RuntimeCenterProps) {
                     Refresh
                   </button>
                 </div>
-                
+
                 {status === 'checking' || isRefreshing ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 text-accent animate-spin" />
                   </div>
-                ) : status === 'not-installed' ? (
+                ) : !isRunning ? (
                   <div className="p-4 rounded-lg bg-warning/10 border border-warning/20">
                     <p className="text-body-sm text-warning">
-                      Ollama is not installed. 
-                      <a 
-                        href="https://ollama.com" 
-                        target="_blank" 
+                      Ollama is not running.{' '}
+                      <a
+                        href="https://ollama.com"
+                        target="_blank"
                         rel="noopener noreferrer"
-                        className="underline ml-1 inline-flex items-center gap-1"
+                        className="underline inline-flex items-center gap-1"
                       >
                         Install Ollama <ExternalLink className="w-3 h-3" />
                       </a>
+                      {' '}or run <code className="bg-bg-elevated px-1 rounded">ollama serve</code>.
                     </p>
                   </div>
                 ) : (
-                  <motion.div 
+                  <motion.div
                     variants={staggerContainer}
                     initial="hidden"
                     animate="visible"

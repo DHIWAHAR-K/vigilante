@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ConversationGroup } from './ConversationGroup';
 import { ConversationItem } from './ConversationItem';
 import { useConversationStore } from '@/store/useConversationStore';
@@ -23,6 +24,7 @@ interface ConversationListProps {
 }
 
 export function ConversationList({ searchQuery }: ConversationListProps) {
+  const router = useRouter();
   const { conversations, activeConversationId, deleteConversation, openConversation } = useConversationStore();
   const [mounted, setMounted] = useState(false);
 
@@ -58,6 +60,10 @@ export function ConversationList({ searchQuery }: ConversationListProps) {
 
   const handleSelect = (id: string) => {
     openConversation(id);
+    // Navigate to home if on a different page
+    if (window.location.pathname !== '/') {
+      router.push('/');
+    }
   };
 
   const groupOrder = ['Today', 'Yesterday', 'Previous 7 Days', 'Previous 30 Days', 'Older'];

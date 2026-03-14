@@ -1,187 +1,184 @@
-import { invoke } from '@tauri-apps/api/core';
-
-export type RuntimeStatus = 'unknown' | 'running' | 'available' | 'stopped' | 'not-installed' | 'error';
+// ─── Types — stay in sync with packages/providers/src/base.ts ModelInfo ───────
 
 export interface RuntimeModel {
-  id: string;
-  name: string;
-  size_bytes: number;
-  modified_at: string | null;
-  family: string | null;
-  parameter_size: string | null;
-  quantization: string | null;
+  id: string
+  name: string
+  sizeBytes?: number
+  modifiedAt?: string
+  family?: string
+  parameterSize?: string
+  quantization?: string
 }
 
 export interface RuntimeStatusResponse {
-  status: RuntimeStatus;
-  version: string | null;
-  models: RuntimeModel[];
-  base_url: string;
-  probed_at: string;
+  available: boolean
+  provider: string
+  models: RuntimeModel[]
+  defaultModel: string | null
 }
 
 export interface QueryRequest {
-  query: string;
-  conversationId: string | null;
-  mode: 'ask' | 'research' | 'rag' | 'agent';
+  query: string
+  conversationId: string | null
+  mode: 'ask'
   provider: {
-    id: string;
-    model: string;
-  };
-  webSearch: boolean;
-  files: string[];
+    id: string
+    model: string
+  }
+  webSearch?: boolean
+  files?: string[]
 }
 
-export interface QueryResponse {}
-
 export interface SSETokenEvent {
-  event: 'token';
-  data: {
-    token: string;
-  };
+  event: 'token'
+  data: { token: string }
 }
 
 export interface SSESourcesEvent {
-  event: 'sources';
-  data: {
-    sources: Source[];
-  };
+  event: 'sources'
+  data: { sources: Source[] }
 }
 
 export interface SSEFollowupsEvent {
-  event: 'followups';
-  data: {
-    questions: string[];
-  };
+  event: 'followups'
+  data: { questions: string[] }
 }
 
 export interface SSEDoneEvent {
-  event: 'done';
-  data: {
-    messageId: string;
-    tokensUsed: number;
-  };
+  event: 'done'
+  data: { messageId: string; conversationId: string; tokensUsed: number | null }
 }
 
 export interface SSEErrorEvent {
-  event: 'error';
-  data: {
-    message: string;
-  };
+  event: 'error'
+  data: { message: string }
 }
 
-export type SSEEvent = 
-  | SSETokenEvent 
-  | SSESourcesEvent 
-  | SSEFollowupsEvent 
-  | SSEDoneEvent 
-  | SSEErrorEvent;
+export type SSEEvent =
+  | SSETokenEvent
+  | SSESourcesEvent
+  | SSEFollowupsEvent
+  | SSEDoneEvent
+  | SSEErrorEvent
 
 export interface Source {
-  id: string;
-  title: string;
-  url: string;
-  favicon?: string;
-  excerpt?: string;
+  id: string
+  title: string
+  url: string
+  favicon?: string
+  excerpt?: string
 }
 
-export const formatBytes = (bytes: number): string => {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-};
+export function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+}
+
+// ─── Config ───────────────────────────────────────────────────────────────────
+
+const ORCHESTRATOR_URL =
+  process.env.NEXT_PUBLIC_ORCHESTRATOR_URL ?? 'http://localhost:3001'
+
+// ─── Runtime ─────────────────────────────────────────────────────────────────
 
 export async function checkRuntime(): Promise<RuntimeStatusResponse> {
-  return invoke<RuntimeStatusResponse>('check_runtime');
+  const res = await fetch(`${ORCHESTRATOR_URL}/api/runtime/status`)
+  if (!res.ok) throw new Error(`Runtime check failed: HTTP ${res.status}`)
+  return res.json() as Promise<RuntimeStatusResponse>
 }
 
-export async function getCachedRuntimeStatus(): Promise<RuntimeStatusResponse> {
-  return invoke<RuntimeStatusResponse>('get_cached_runtime_status');
+export async function listModels(providerId = 'ollama'): Promise<RuntimeModel[]> {
+  const res = await fetch(
+    `${ORCHESTRATOR_URL}/api/models?provider=${encodeURIComponent(providerId)}`,
+  )
+  if (!res.ok) return []
+  const data = (await res.json()) as { models?: RuntimeModel[] }
+  return data.models ?? []
 }
 
-export async function listModels(): Promise<RuntimeModel[]> {
-  return invoke<RuntimeModel[]>('list_models');
-}
+// ─── Query streaming ──────────────────────────────────────────────────────────
 
-let abortController: AbortController | null = null;
+let abortController: AbortController | null = null
 
 export async function* streamQuery(request: QueryRequest): AsyncGenerator<SSEEvent> {
-  abortController = new AbortController();
-  
-  const response = await fetch('http://localhost:3000/api/query', {
+  abortController = new AbortController()
+
+  const response = await fetch(`${ORCHESTRATOR_URL}/api/query`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
     signal: abortController.signal,
-  });
+  })
 
   if (!response.ok) {
-    const error = await response.text();
-    yield { event: 'error', data: { message: error || 'Request failed' } };
-    return;
+    const text = await response.text()
+    yield {
+      event: 'error',
+      data: { message: text || `Request failed: HTTP ${response.status}` },
+    }
+    return
   }
 
   if (!response.body) {
-    yield { event: 'error', data: { message: 'No response body' } };
-    return;
+    yield { event: 'error', data: { message: 'No response body' } }
+    return
   }
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let currentEvent = ''
 
   try {
     while (true) {
-      const { done, value } = await reader.read();
-      
-      if (done) break;
-      
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
 
       for (const line of lines) {
         if (line.startsWith('event:')) {
-          continue;
-        }
-        
-        if (line.startsWith('data:')) {
-          const data = line.slice(5).trim();
-          if (!data) continue;
-          
+          currentEvent = line.slice(6).trim()
+        } else if (line.startsWith('data:')) {
+          const raw = line.slice(5).trim()
+          if (!raw) continue
           try {
-            const parsed = JSON.parse(data);
-            
-            if (parsed.token) {
-              yield { event: 'token', data: { token: parsed.token } };
-            } else if (parsed.sources) {
-              yield { event: 'sources', data: { sources: parsed.sources } };
-            } else if (parsed.questions) {
-              yield { event: 'followups', data: { questions: parsed.questions } };
-            } else if (parsed.messageId) {
-              yield { event: 'done', data: parsed };
-            } else if (parsed.message) {
-              yield { event: 'error', data: parsed };
+            const data = JSON.parse(raw) as Record<string, unknown>
+            switch (currentEvent) {
+              case 'token':
+                yield { event: 'token', data: data as SSETokenEvent['data'] }
+                break
+              case 'sources':
+                yield { event: 'sources', data: data as SSESourcesEvent['data'] }
+                break
+              case 'followups':
+                yield { event: 'followups', data: data as SSEFollowupsEvent['data'] }
+                break
+              case 'done':
+                yield { event: 'done', data: data as SSEDoneEvent['data'] }
+                break
+              case 'error':
+                yield { event: 'error', data: data as SSEErrorEvent['data'] }
+                break
             }
           } catch {
-            // Skip invalid JSON
+            // Skip malformed JSON
           }
         }
       }
     }
   } finally {
-    reader.releaseLock();
-    abortController = null;
+    reader.releaseLock()
+    abortController = null
   }
 }
 
 export function abortQuery(): void {
-  if (abortController) {
-    abortController.abort();
-    abortController = null;
-  }
+  abortController?.abort()
+  abortController = null
 }

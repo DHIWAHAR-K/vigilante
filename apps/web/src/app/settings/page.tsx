@@ -2,6 +2,8 @@
 
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 import { ThemeSegmentedControl } from '@/components/theme/ThemeSegmentedControl';
 import { homeFadeIn } from '@/lib/motion-config';
 import { useRuntimeStore } from '@/store/useRuntimeStore';
@@ -9,7 +11,8 @@ import { Server, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
-  const { status, ollamaVersion, models, isChecking, checkRuntime } = useRuntimeStore();
+  const router = useRouter();
+  const { status, models, isChecking, checkRuntime } = useRuntimeStore();
 
   useEffect(() => {
     checkRuntime();
@@ -18,13 +21,24 @@ export default function SettingsPage() {
   const isConnected = status === 'running' || status === 'available';
 
   return (
-    <motion.div 
+    <motion.div
       initial="hidden"
       animate="visible"
       variants={homeFadeIn}
       className="flex flex-col min-h-full w-full bg-bg-base"
     >
-      <div className="w-full max-w-3xl mx-auto px-8 py-16 h-full flex flex-col gap-12">
+      {/* Back button */}
+      <div className="px-8 pt-6">
+        <button
+          onClick={() => router.push('/')}
+          className="flex items-center gap-2 text-text-muted hover:text-text-primary transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="text-body-sm">Back to Chat</span>
+        </button>
+      </div>
+
+      <div className="w-full max-w-3xl mx-auto px-8 py-8 h-full flex flex-col gap-12">
         
         <div className="flex flex-col gap-2">
           <h1 className="text-display-md text-text-primary">Settings</h1>
@@ -62,8 +76,8 @@ export default function SettingsPage() {
           <div className="flex flex-col gap-4">
             <div className={cn(
               "p-6 rounded-xl border flex flex-col gap-2 relative overflow-hidden group",
-              isConnected 
-                ? "bg-bg-surface border-border-subtle" 
+              isConnected
+                ? "bg-bg-surface border-border-subtle"
                 : "bg-warning/5 border-warning/20"
             )}>
               <div className={cn(
@@ -92,11 +106,8 @@ export default function SettingsPage() {
                   </span>
                 )}
               </div>
-              
+
               <div className="flex items-center gap-4 mt-2">
-                <p className="text-caption text-text-secondary">
-                  {ollamaVersion ? `Version: ${ollamaVersion}` : 'No version detected'}
-                </p>
                 {models.length > 0 && (
                   <p className="text-caption text-text-secondary">
                     {models.length} model{models.length !== 1 ? 's' : ''} installed
@@ -117,7 +128,7 @@ export default function SettingsPage() {
                 <p className="text-caption text-text-muted mb-2">Installed Models</p>
                 <div className="flex flex-wrap gap-2">
                   {models.map((model) => (
-                    <span 
+                    <span
                       key={model.id}
                       className="text-mono-xs text-text-secondary bg-bg-elevated px-2 py-1 rounded border border-border-subtle"
                     >

@@ -4,7 +4,7 @@ import React from 'react';
 import { Activity, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '../theme/ThemeToggle';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 interface SidebarFooterProps {
   isSidebarCollapsed: boolean;
@@ -13,11 +13,12 @@ interface SidebarFooterProps {
 
 export function SidebarFooter({ isSidebarCollapsed, isOnline }: SidebarFooterProps) {
   const router = useRouter();
+  const pathname = usePathname();
 
   if (isSidebarCollapsed) {
     return (
       <div className="flex flex-col gap-2 items-center w-[64px] mx-0 absolute left-0 bottom-3">
-        <IconButton icon={<Activity className="w-[18px] h-[18px]" />} title="Activity" />
+        <IconButton icon={<Activity className="w-[18px] h-[18px]" />} title="Activity" onClick={() => router.push('/')} />
         <div className="relative">
           <IconButton 
             icon={<Settings className="w-[18px] h-[18px]" />} 
@@ -36,10 +37,11 @@ export function SidebarFooter({ isSidebarCollapsed, isOnline }: SidebarFooterPro
 
   return (
     <div className="flex flex-col gap-1 w-full px-1">
-      <ActionRow icon={<Activity className="w-4 h-4" />} label="Activity" />
+      <ActionRow icon={<Activity className="w-4 h-4" />} label="Activity" isActive={pathname === '/'} onClick={() => router.push('/')} />
       <ActionRow 
         icon={<Settings className="w-4 h-4" />} 
         label="Settings" 
+        isActive={pathname === '/settings'}
         statusDot={isOnline ? "bg-success shadow-[0_0_8px_var(--success-subtle)]" : "bg-accent shadow-[0_0_8px_var(--accent-subtle)]"} 
         onClick={() => router.push('/settings')}
       />
@@ -61,7 +63,7 @@ function IconButton({ icon, active, onClick, title }: { icon: React.ReactNode; a
   );
 }
 
-function ActionRow({ icon, label, statusDot, onClick }: { icon: React.ReactNode; label: string; statusDot?: string; onClick?: () => void }) {
+function ActionRow({ icon, label, statusDot, isActive, onClick }: { icon: React.ReactNode; label: string; statusDot?: string; isActive?: boolean; onClick?: () => void }) {
   return (
     <button onClick={onClick} className="w-full flex items-center gap-3 px-3 h-10 rounded-xl text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors text-left group relative">
       <div className="w-5 flex justify-center relative">
@@ -72,7 +74,7 @@ function ActionRow({ icon, label, statusDot, onClick }: { icon: React.ReactNode;
       </div>
       <span className="text-body-sm">{label}</span>
       {/* Precision notch for active items */}
-      <div className="absolute top-0 right-0 w-0.5 h-full bg-accent" />
+      {isActive && <div className="absolute top-0 right-0 w-0.5 h-full bg-accent" />}
     </button>
   );
 }

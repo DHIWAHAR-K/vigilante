@@ -11,11 +11,8 @@ import { HomeIntro } from '@/components/layout/HomeIntro';
 import { SourceTray } from '@/components/sources/SourceTray';
 import { RuntimeStatusChip } from '@/components/runtime/RuntimeStatusChip';
 import { useRuntimeStore } from '@/store/useRuntimeStore';
+import { useQueryStream, generateId } from '@/lib/hooks/useQueryStream';
 import { conversationStateVariants, TRANSITIONS } from '@/lib/motion-config';
-
-function generateId() {
-  return Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-}
 
 function generateTitle(content: string): string {
   const firstLine = content.split('\n')[0];
@@ -23,16 +20,15 @@ function generateTitle(content: string): string {
 }
 
 export function ConversationWorkspace() {
-  const { 
-    activeConversationId, 
-    conversations, 
+  const {
+    activeConversationId,
+    conversations,
     isDraftMode,
     setDraftInput,
     createConversationFromDraft,
     addMessage,
-    updateAssistantMessage,
   } = useConversationStore();
-  
+
   const { setRuntimeCenterOpen } = useUIStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
@@ -41,13 +37,15 @@ export function ConversationWorkspace() {
   const [sourceTrayExpanded, setSourceTrayExpanded] = useState(false);
   const [justSentFirstMessage, setJustSentFirstMessage] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
-  
+
   const streamingMessageIdRef = useRef<string | null>(null);
-  
+  // Keep a ref to accumulate content so handleStreamComplete always sees full content
+  const streamingContentRef = useRef('');
+
   const activeConversation = conversations.find(c => c.id === activeConversationId);
   const hasMessages = activeConversation?.messages && activeConversation.messages.length > 0;
   const isInConversation = isDraftMode || hasMessages;
-  const { status, isOnline, selectedModel, checkRuntime } = useRuntimeStore();
+  const { status, selectedModel, checkRuntime } = useRuntimeStore();
 
   // Initialize runtime on mount
   useEffect(() => {
@@ -55,6 +53,7 @@ export function ConversationWorkspace() {
   }, []);
 
   const handleToken = useCallback((token: string) => {
+    streamingContentRef.current += token;
     setStreamingContent(prev => prev + token);
   }, []);
 
@@ -66,7 +65,7 @@ export function ConversationWorkspace() {
     setStreamingFollowups(questions);
   }, []);
 
-  const handleDone = useCallback((messageId: string, tokensUsed: number) => {
+  const handleDone = useCallback((messageId: string, _tokensUsed: number) => {
     streamingMessageIdRef.current = messageId;
   }, []);
 
@@ -75,128 +74,80 @@ export function ConversationWorkspace() {
   }, []);
 
   const handleStreamComplete = useCallback(() => {
-    if (streamingMessageIdRef.current && activeConversationId) {
-      const assistantMessage: Message = {
-        id: streamingMessageIdRef.current,
-        role: 'assistant',
-        content: streamingContent,
-        sources: streamingSources.length > 0 ? streamingSources : undefined,
-        createdAt: new Date()
-      };
-      
-      addMessage(activeConversationId, assistantMessage);
+    if (activeConversationId) {
+      const messageId = streamingMessageIdRef.current ?? generateId();
+      const content = streamingContentRef.current;
+
+      if (content) {
+        const assistantMessage: Message = {
+          id: messageId,
+          role: 'assistant',
+          content,
+          sources: streamingSources.length > 0 ? streamingSources : undefined,
+          createdAt: new Date(),
+        };
+        addMessage(activeConversationId, assistantMessage);
+      }
     }
-    
+
+    streamingContentRef.current = '';
     setStreamingContent('');
     setStreamingSources([]);
     setStreamingFollowups([]);
     streamingMessageIdRef.current = null;
     setIsSubmitting(false);
     setStreamError(null);
-  }, [activeConversationId, streamingContent, streamingSources, addMessage]);
+  }, [activeConversationId, streamingSources, addMessage]);
 
-  const handleSubmit = useCallback((query: string, context: ContextItem[]) => {
+  const { submitQuery, abort } = useQueryStream({
+    onToken: handleToken,
+    onSources: handleSources,
+    onFollowups: handleFollowups,
+    onDone: handleDone,
+    onError: handleStreamError,
+    onComplete: handleStreamComplete,
+  });
+
+  const handleSubmit = useCallback((query: string, _context: ContextItem[]) => {
     if (!query.trim() || isSubmitting) return;
-    
+
     const wasDraft = isDraftMode;
     setIsSubmitting(true);
     setStreamError(null);
+    streamingContentRef.current = '';
     setStreamingContent('');
     setStreamingSources([]);
     setStreamingFollowups([]);
-    
+
     let conversationId = activeConversationId;
-    
+
     if (wasDraft) {
       const newConv = createConversationFromDraft(generateTitle(query));
       conversationId = newConv.id;
       setJustSentFirstMessage(true);
       setTimeout(() => setJustSentFirstMessage(false), 600);
     }
-    
+
     const userMessage: Message = {
       id: generateId(),
       role: 'user',
       content: query,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
-    
+
     addMessage(conversationId!, userMessage);
     setDraftInput('');
 
-    // Stream from Ollama directly
-    const streamFromOllama = async () => {
-      const model = selectedModel || 'llama3.2';
-      
-      try {
-        const response = await fetch('http://localhost:11434/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model,
-            prompt: `You are a helpful AI assistant. Answer the user's question concisely and accurately.\n\nUser: ${query}\n\nAssistant:`,
-            stream: true,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Ollama error: ${response.status}`);
-        }
-
-        if (!response.body) {
-          throw new Error('No response body');
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let messageId = generateId();
-        streamingMessageIdRef.current = messageId;
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            try {
-              const parsed = JSON.parse(line);
-              if (parsed.response) {
-                handleToken(parsed.response);
-              }
-              if (parsed.done) {
-                handleDone(messageId, parsed.prompt_eval_count + parsed.eval_count || 0);
-              }
-            } catch {
-              // Skip invalid JSON
-            }
-          }
-        }
-      } catch (error) {
-        handleStreamError(error instanceof Error ? error.message : 'Failed to connect to Ollama');
-      } finally {
-        handleStreamComplete();
-      }
-    };
-
-    // Start streaming with a small delay
-    setTimeout(streamFromOllama, 300);
+    submitQuery(query, conversationId ?? null, selectedModel);
   }, [
-    activeConversationId, 
-    isDraftMode, 
-    createConversationFromDraft, 
-    addMessage, 
-    setDraftInput, 
+    activeConversationId,
+    isDraftMode,
+    createConversationFromDraft,
+    addMessage,
+    setDraftInput,
     isSubmitting,
     selectedModel,
-    handleToken,
-    handleDone,
-    handleStreamError,
-    handleStreamComplete,
+    submitQuery,
   ]);
 
   // Close source tray when new message comes in
@@ -206,8 +157,6 @@ export function ConversationWorkspace() {
     }
   }, [activeConversation?.messages?.length]);
 
-  // Combine streaming content with existing messages for display
-  const displayMessages = activeConversation?.messages || [];
   const hasStreamingContent = streamingContent.length > 0 || isSubmitting;
 
   return (
@@ -230,8 +179,8 @@ export function ConversationWorkspace() {
             </motion.div>
           )}
         </div>
-        
-            <RuntimeStatusChip onClick={() => setRuntimeCenterOpen(true)} />
+
+        <RuntimeStatusChip onClick={() => setRuntimeCenterOpen(true)} />
       </div>
 
       <AnimatePresence mode="wait">
@@ -244,11 +193,11 @@ export function ConversationWorkspace() {
             transition={TRANSITIONS.smooth}
             className="flex flex-col flex-1 overflow-hidden"
           >
-            <ConversationThread 
-              conversation={activeConversation || null} 
+            <ConversationThread
+              conversation={activeConversation || null}
               isDraft={isDraftMode}
             />
-            
+
             {/* Streaming Response */}
             <AnimatePresence>
               {hasStreamingContent && (
@@ -296,7 +245,7 @@ export function ConversationWorkspace() {
                       {streamError}
                     </p>
                     <button
-                      onClick={() => setStreamError(null)}
+                      onClick={() => { setStreamError(null); abort(); }}
                       className="mt-2 text-caption text-text-muted hover:text-text-primary"
                     >
                       Dismiss
@@ -308,17 +257,17 @@ export function ConversationWorkspace() {
 
             {/* Source Tray */}
             {activeConversation?.messages && activeConversation.messages.some(m => m.sources) && (
-              <SourceTray 
+              <SourceTray
                 sources={activeConversation.messages.flatMap(m => m.sources || [])}
                 isExpanded={sourceTrayExpanded}
                 onToggle={() => setSourceTrayExpanded(!sourceTrayExpanded)}
               />
             )}
-            
+
             {/* Composer */}
             <div className="absolute bottom-0 left-0 right-0 pb-6 pt-4 bg-gradient-to-t from-bg-base via-bg-base to-transparent">
               <div className="max-w-[760px] mx-auto w-full px-6">
-                <QueryInput 
+                <QueryInput
                   onSubmit={handleSubmit}
                   disabled={isSubmitting}
                 />
@@ -338,12 +287,12 @@ export function ConversationWorkspace() {
             <div className="absolute inset-0 rounded-xl pointer-events-none overflow-hidden">
               <div className="absolute inset-0 bg-gradient-radial from-accent/5 via-transparent to-transparent opacity-30" />
             </div>
-            
+
             <div className="flex-1 w-full max-w-[760px] flex flex-col justify-center items-center px-6 pb-[15vh]">
               <HomeIntro />
-              
+
               <div className="w-full flex flex-col gap-6 relative z-10">
-                <QueryInput 
+                <QueryInput
                   onSubmit={handleSubmit}
                 />
               </div>

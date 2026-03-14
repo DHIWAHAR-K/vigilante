@@ -27,18 +27,10 @@ function DetectionRow({ label, status, value, delay }: DetectionRowProps) {
     >
       <span className="text-body-sm text-text-secondary">{label}</span>
       <div className="flex items-center gap-2">
-        {status === 'checking' && (
-          <Loader2 className="w-4 h-4 text-accent animate-spin" />
-        )}
-        {status === 'success' && (
-          <CheckCircle2 className="w-4 h-4 text-success" />
-        )}
-        {status === 'error' && (
-          <AlertCircle className="w-4 h-4 text-error" />
-        )}
-        {status === 'warning' && (
-          <AlertCircle className="w-4 h-4 text-warning" />
-        )}
+        {status === 'checking' && <Loader2 className="w-4 h-4 text-accent animate-spin" />}
+        {status === 'success' && <CheckCircle2 className="w-4 h-4 text-success" />}
+        {status === 'error' && <AlertCircle className="w-4 h-4 text-error" />}
+        {status === 'warning' && <AlertCircle className="w-4 h-4 text-warning" />}
         {value && (
           <span className={cn(
             "text-body-sm font-medium",
@@ -56,17 +48,14 @@ function DetectionRow({ label, status, value, delay }: DetectionRowProps) {
 }
 
 export function DetectRuntimeStep({ onNext }: DetectRuntimeStepProps) {
-  const { status, checkRuntime, isOllamaInstalled, ollamaVersion, isOnline, isChecking } = useRuntimeStore();
+  const { status, checkRuntime, isOnline, isChecking } = useRuntimeStore();
 
   useEffect(() => {
     checkRuntime();
   }, [checkRuntime]);
 
-  const handleCheck = async () => {
-    await checkRuntime();
-  };
-
-  const canContinue = status === 'running' || status === 'available';
+  const isRunning = status === 'running';
+  const canContinue = isRunning;
 
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto">
@@ -107,24 +96,17 @@ export function DetectRuntimeStep({ onNext }: DetectRuntimeStepProps) {
         </div>
 
         <DetectionRow
-          label="Installation"
-          status={isChecking ? 'checking' : isOllamaInstalled ? 'success' : 'error'}
-          value={isChecking ? 'Checking...' : isOllamaInstalled ? (ollamaVersion || 'Installed') : 'Not found'}
-          delay={0.3}
-        />
-
-        <DetectionRow
           label="Server Status"
-          status={isChecking ? 'checking' : status === 'running' ? 'success' : status === 'available' ? 'warning' : 'error'}
-          value={isChecking ? 'Checking...' : status === 'running' ? 'Running' : status === 'available' ? 'Available' : 'Stopped'}
-          delay={0.34}
+          status={isChecking ? 'checking' : isRunning ? 'success' : 'error'}
+          value={isChecking ? 'Checking…' : isRunning ? 'Running' : 'Not running'}
+          delay={0.3}
         />
 
         <DetectionRow
           label="Network"
           status={isOnline ? 'success' : 'warning'}
           value={isOnline ? 'Online' : 'Offline'}
-          delay={0.38}
+          delay={0.34}
         />
       </motion.div>
 
@@ -135,7 +117,7 @@ export function DetectRuntimeStep({ onNext }: DetectRuntimeStepProps) {
         transition={{ duration: 0.2, delay: 0.5 }}
         className="flex flex-col gap-3 w-full max-w-[280px] mx-auto"
       >
-        {!isOllamaInstalled && (
+        {!isRunning && (
           <a
             href="https://ollama.com"
             target="_blank"
@@ -153,9 +135,9 @@ export function DetectRuntimeStep({ onNext }: DetectRuntimeStepProps) {
         )}
 
         <div className="flex gap-3">
-          {!isOllamaInstalled && (
+          {!isRunning && (
             <button
-              onClick={handleCheck}
+              onClick={() => checkRuntime()}
               disabled={isChecking}
               className={cn(
                 "flex-1 py-2.5 rounded-lg",
@@ -167,7 +149,7 @@ export function DetectRuntimeStep({ onNext }: DetectRuntimeStepProps) {
               Check Again
             </button>
           )}
-          
+
           <button
             onClick={onNext}
             disabled={!canContinue}
