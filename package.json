@@ -3,9 +3,12 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
+    "vigilante": "node packages/cli/bin/vigilante.mjs",
+    "vigilante:dev": "node packages/cli/bin/vigilante.mjs --dev",
+    "dev": "node packages/cli/bin/vigilante.mjs --dev",
+    "start": "node packages/cli/bin/vigilante.mjs",
     "dev:orchestrator": "pnpm --filter @vigilante/orchestrator dev",
     "dev:web": "pnpm --filter web dev",
-    "dev": "pnpm run dev:orchestrator & pnpm run dev:web",
     "build": "turbo build",
     "typecheck": "turbo typecheck",
     "lint": "pnpm run typecheck"

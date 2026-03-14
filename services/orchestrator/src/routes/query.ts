@@ -1,19 +1,27 @@
 import { Hono } from 'hono'
 import { stream } from 'hono/streaming'
-import { askPipeline } from '../pipelines/ask'
-import { db } from '../db'
-import { registry } from '../providers'
-import { config } from '../config'
+import { askPipeline }   from '../pipelines/ask'
+import { db }            from '../db'
+import { runtimeManager } from '../services/runtime-manager'
+import { config }        from '../config'
+import type { EngineId } from '../types/runtime'
 
 // ─── Request shape ─────────────────────────────────────────────────────────────
 
 interface QueryRequest {
-  query: string
+  query:          string
   conversationId?: string
-  mode?: string
-  provider?: { id?: string; model?: string }
+  mode?:           string
+  /**
+   * Optional explicit engine+model override from the frontend.
+   * If omitted, the active selection from RuntimeManager is used.
+   */
+  provider?: {
+    id?:    string   // engineId — e.g. "ollama", "llama.cpp", "mlx"
+    model?: string
+  }
   webSearch?: boolean
-  files?: string[]
+  files?:     string[]
 }
 
 // ─── Route ────────────────────────────────────────────────────────────────────
@@ -22,7 +30,6 @@ export const queryRoutes = new Hono()
 
 queryRoutes.post('/query', async (c) => {
   let body: QueryRequest
-
   try {
     body = await c.req.json<QueryRequest>()
   } catch {
@@ -31,46 +38,68 @@ queryRoutes.post('/query', async (c) => {
 
   const { query, conversationId, mode = 'ask', provider: providerSpec } = body
 
-  // Log incoming request for debugging (conversationId helps trace streams)
   console.info('[query] request', { conversationId, mode, queryLength: query?.length ?? 0 })
 
   if (!query || typeof query !== 'string' || !query.trim()) {
     return c.json({ error: '`query` is required and must be a non-empty string' }, 400)
   }
 
-  // Phase 0: only "ask" mode is supported
   if (mode !== 'ask') {
     return c.json(
-      { error: `Mode "${mode}" is not supported yet. Only "ask" is available in this version.` },
+      { error: `Mode "${mode}" is not supported yet. Only "ask" is available.` },
       400,
     )
   }
 
-  const providerId = providerSpec?.id ?? 'ollama'
-  const model = providerSpec?.model ?? config.defaultModel
+  // ── Resolve provider + model ───────────────────────────────────────────────
+  //
+  //  Priority:
+  //    1. Explicit `provider.id` in the request (frontend engine picker override).
+  //    2. Active selection stored in RuntimeManager (persisted user preference).
+  //    3. Ollama default (backward compatibility when nothing is selected).
 
   let provider
-  try {
-    provider = registry.getOrThrow(providerId)
-  } catch (err) {
-    return c.json({ error: String(err) }, 400)
+  let model: string
+
+  if (providerSpec?.id) {
+    // Explicit engine requested — validate it exists.
+    const adapter = runtimeManager.getAdapter(providerSpec.id as EngineId)
+    if (!adapter) {
+      return c.json(
+        { error: `Engine "${providerSpec.id}" is not available. Check /api/runtime/engines.` },
+        400,
+      )
+    }
+    provider = adapter.getProvider()
+    model    = providerSpec.model ?? runtimeManager.getActiveModelId(config.defaultModel)
+  } else {
+    // Use the currently selected engine.
+    provider = runtimeManager.getActiveProvider()
+    if (!provider) {
+      return c.json(
+        {
+          error:
+            'No runtime engine is selected. ' +
+            'Call POST /api/runtime/select with { engineId, modelId } first, ' +
+            'or install Ollama for automatic default selection.',
+        },
+        503,
+      )
+    }
+    model = providerSpec?.model ?? runtimeManager.getActiveModelId(config.defaultModel)
   }
 
   // ── SSE headers ─────────────────────────────────────────────────────────────
+
   c.header('Content-Type', 'text/event-stream; charset=utf-8')
   c.header('Cache-Control', 'no-cache, no-transform')
-  c.header('Connection', 'keep-alive')
-  c.header('X-Accel-Buffering', 'no') // Disable nginx buffering when proxied
+  c.header('Connection',    'keep-alive')
+  c.header('X-Accel-Buffering', 'no')  // disable nginx buffering when proxied
 
   return stream(c, async (s) => {
-    // Wire up abort when the client disconnects
     const abortController = new AbortController()
     s.onAbort(() => abortController.abort())
 
-    /**
-     * Write a single SSE event.
-     * Format: "event: <name>\ndata: <json>\n\n"
-     */
     const writeEvent = async (name: string, data: unknown): Promise<void> => {
       await s.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`)
     }
@@ -90,9 +119,8 @@ queryRoutes.post('/query', async (c) => {
         await writeEvent(event.name, event.data)
       }
     } catch (err) {
-      // Surface errors to the client as a structured SSE event
       let message = err instanceof Error ? err.message : String(err)
-      // Unwrap Node.js fetch "fetch failed" to expose the actual cause
+      // Unwrap Node.js "fetch failed" to expose the real cause.
       if (message === 'fetch failed' && err instanceof Error && err.cause instanceof Error) {
         message = err.cause.message
       }

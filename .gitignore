@@ -4,6 +4,8 @@ node_modules/
 dist/
 .next/
 out/
+apps/web/src-tauri/target/
+apps/web/src-tauri/gen/
 
 # SQLite database files (generated at runtime)
 *.db

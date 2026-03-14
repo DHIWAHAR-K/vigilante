@@ -8,6 +8,7 @@ import { corsMiddleware } from './middleware/cors'
 import { queryRoutes } from './routes/query'
 import { runtimeRoutes } from './routes/runtime'
 import { conversationRoutes } from './routes/conversations'
+import { modelRoutes } from './routes/models'
 import { config } from './config'
 
 // Eagerly initialise DB (creates tables if they don't exist)
@@ -25,6 +26,7 @@ app.use('*', logger())
 app.route('/api', queryRoutes)
 app.route('/api', runtimeRoutes)
 app.route('/api', conversationRoutes)
+app.route('/api', modelRoutes)
 
 // Catch-all 404
 app.notFound((c) => c.json({ error: 'Not found' }, 404))
@@ -38,13 +40,5 @@ app.onError((err, c) => {
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 serve({ fetch: app.fetch, port: config.port }, (info) => {
-  console.log(`
-╔═══════════════════════════════════════════════╗
-║         Vigilante Orchestrator                ║
-╠═══════════════════════════════════════════════╣
-║  Listening on  http://localhost:${info.port}        ║
-║  Ollama URL    ${config.ollamaBaseUrl.padEnd(32)}║
-║  Database      ${config.dbPath.padEnd(32)}║
-╚═══════════════════════════════════════════════╝
-`)
+  console.log(`[orchestrator] listening on http://localhost:${info.port}`)
 })

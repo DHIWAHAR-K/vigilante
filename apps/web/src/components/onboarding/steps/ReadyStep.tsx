@@ -12,8 +12,8 @@ interface ReadyStepProps {
 }
 
 export function ReadyStep({ onComplete }: ReadyStepProps) {
-  const { models, selectedModel } = useRuntimeStore();
-  const selectedModelInfo = models.find(m => m.id === selectedModel);
+  const { selection, installedModels } = useRuntimeStore();
+  const selectedModelInfo = selection ? installedModels.find(m => m.id === selection.modelId) : null;
 
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto text-center">
@@ -62,7 +62,7 @@ export function ReadyStep({ onComplete }: ReadyStepProps) {
       >
         <Cpu className="w-4 h-4 text-accent" />
         <span className="text-body-sm font-medium text-accent">
-          {selectedModelInfo?.name || selectedModel}
+          {selectedModelInfo?.name || selection?.modelId || 'No model selected'}
         </span>
         <CheckCircle2 className="w-3.5 h-3.5 text-success" />
       </motion.div>

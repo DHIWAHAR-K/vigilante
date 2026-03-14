@@ -10,7 +10,6 @@ import { DetectRuntimeStep } from './steps/DetectRuntimeStep';
 import { ModelDiscoveryStep } from './steps/ModelDiscoveryStep';
 import { ModelSelectStep } from './steps/ModelSelectStep';
 import { ReadyStep } from './steps/ReadyStep';
-import { useRuntimeStore } from '@/store/useRuntimeStore';
 
 export type OnboardingVariant = 'welcome' | 'detect' | 'discover' | 'select' | 'ready';
 
@@ -35,7 +34,7 @@ const stepVariants = {
 
 export function OnboardingFlow({ isOpen, onComplete }: OnboardingFlowProps) {
   const [currentStep, setCurrentStep] = useState(0);
-  const { checkRuntime } = useRuntimeStore();
+  // ensureReady is called by DetectRuntimeStep; no extra store access needed here.
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {

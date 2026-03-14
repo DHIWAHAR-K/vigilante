@@ -8,7 +8,7 @@ export function SidebarHeader() {
   const { isSidebarCollapsed, toggleSidebar } = useUIStore();
 
   return (
-    <div className="flex items-center justify-between px-3 h-10 shrink-0 mb-4 w-full relative" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+    <div className="flex items-center justify-between px-3 h-10 shrink-0 mb-4 w-full relative">
       <div className={cn("flex items-center gap-2.5 overflow-hidden", isSidebarCollapsed && "w-0 opacity-0")}>
         <div className="w-6 h-6 flex items-center justify-center shrink-0">
           <VigilanteLogo />

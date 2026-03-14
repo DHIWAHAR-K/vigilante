@@ -44,7 +44,7 @@ export function CommandPalette({ isOpen, onClose, onOpenRuntime, onOpenOnboardin
   
   const { toggleSidebar, setProviderSelectorOpen } = useUIStore();
   const { startDraftThread, conversations } = useConversationStore();
-  const { selectedModel, models } = useRuntimeStore();
+  const { selection, installedModels } = useRuntimeStore();
 
   const commands: Command[] = useMemo(() => [
     {
@@ -84,7 +84,7 @@ export function CommandPalette({ isOpen, onClose, onOpenRuntime, onOpenOnboardin
     },
     {
       id: 'select-model',
-      title: `Model: ${models.find(m => m.id === selectedModel)?.name || selectedModel}`,
+      title: `Model: ${selection ? installedModels.find(m => m.id === selection.modelId)?.name || selection.modelId : 'None'}`,
       description: 'Change the active model',
       icon: Zap,
       action: () => {
@@ -105,7 +105,7 @@ export function CommandPalette({ isOpen, onClose, onOpenRuntime, onOpenOnboardin
       },
       category: 'settings',
     },
-  ], [selectedModel, models, startDraftThread, toggleSidebar, onClose, onOpenRuntime]);
+  ], [selection, installedModels, startDraftThread, toggleSidebar, onClose, onOpenRuntime]);
 
   const filteredCommands = useMemo(() => {
     if (!query.trim()) return commands;

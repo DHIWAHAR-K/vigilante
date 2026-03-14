@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react'
 import { Source } from '@/store/useConversationStore'
+import type { EngineId } from '@/lib/api/client'
 
 const ORCHESTRATOR_URL =
   process.env.NEXT_PUBLIC_ORCHESTRATOR_URL ?? 'http://localhost:3001'
@@ -21,7 +22,8 @@ interface UseQueryStreamReturn {
   submitQuery: (
     query: string,
     conversationId: string | null,
-    selectedModel: string | null,
+    engineId: EngineId | null,
+    modelId: string | null,
   ) => void
   isStreaming: boolean
   abort: () => void
@@ -33,12 +35,12 @@ export function useQueryStream(options: UseQueryStreamOptions): UseQueryStreamRe
   const abortControllerRef = useRef<AbortController | null>(null)
 
   const submitQuery = useCallback(
-    (query: string, conversationId: string | null, selectedModel: string | null) => {
+    (query: string, conversationId: string | null, engineId: EngineId | null, modelId: string | null) => {
       if (isStreamingRef.current) {
         options.onError('Already streaming')
         return
       }
-      if (!selectedModel) {
+      if (!modelId) {
         options.onError('No model selected')
         return
       }
@@ -49,17 +51,20 @@ export function useQueryStream(options: UseQueryStreamOptions): UseQueryStreamRe
 
       ;(async () => {
         try {
+          const payload: Record<string, unknown> = {
+            query,
+            conversationId,
+            mode: 'ask',
+            webSearch: false,
+            files: [],
+          }
+          if (engineId && modelId) {
+            payload.provider = { id: engineId, model: modelId }
+          }
           const response = await fetch(`${ORCHESTRATOR_URL}/api/query`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              query,
-              conversationId,
-              mode: 'ask',
-              provider: { id: 'ollama', model: selectedModel },
-              webSearch: false,
-              files: [],
-            }),
+            body: JSON.stringify(payload),
             signal: abortControllerRef.current?.signal,
           })
 

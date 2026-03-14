@@ -1,105 +1,183 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { checkRuntime, RuntimeModel, formatBytes } from '@/lib/api/client'
+import {
+  ensureRuntimeReady,
+  probeRuntime,
+  setSelection as apiSetSelection,
+  getSelection as apiGetSelection,
+  getModelCatalog,
+  startModelPull,
+  getPullJob,
+  getInstalledModels,
+  EngineId,
+  RuntimeEngine,
+  InstalledModel,
+  RuntimeSelection,
+  PullJob,
+  CatalogModel,
+  formatBytes,
+} from '@/lib/api/client'
 
-export type RuntimeStatus = 'checking' | 'unknown' | 'running' | 'available' | 'stopped' | 'not-installed' | 'error'
+export type RuntimeStatus =
+  | 'checking'
+  | 'starting'
+  | 'ready'
+  | 'no_models'
+  | 'error'
 
 export type ModelInfo = {
-  id: string
-  name: string
-  size: string
-  modifiedAt: Date
+  id:         string
+  name:       string
+  engineId:   EngineId
+  size:       string
+  format:     string
 }
 
-function mapRuntimeModel(model: RuntimeModel): ModelInfo {
+function mapInstalledModel(m: InstalledModel): ModelInfo {
   return {
-    id: model.id,
-    name: model.name,
-    size: model.sizeBytes !== undefined ? formatBytes(model.sizeBytes) : 'Unknown',
-    modifiedAt: model.modifiedAt ? new Date(model.modifiedAt) : new Date(),
+    id:       m.id,
+    name:     m.name,
+    engineId: m.engineId,
+    size:     m.sizeBytes ? formatBytes(m.sizeBytes) : 'Unknown',
+    format:   m.format,
   }
 }
 
 interface RuntimeState {
-  status: RuntimeStatus
-  isOnline: boolean
-  models: ModelInfo[]
-  selectedModel: string | null
-  isChecking: boolean
-  error: string | null
+  status:          RuntimeStatus
+  engines:         RuntimeEngine[]
+  selection:       RuntimeSelection | null
+  installedModels: ModelInfo[]
+  catalogModels:   CatalogModel[]
+  pullJob:         PullJob | null
+  isChecking:      boolean
+  isPulling:       boolean
+  error:           string | null
 
-  setStatus: (status: RuntimeStatus) => void
-  setOnline: (online: boolean) => void
-  setModels: (models: ModelInfo[]) => void
-  selectModel: (modelId: string) => void
-  setError: (error: string | null) => void
-  checkRuntime: () => Promise<void>
+  refreshStatus:     () => Promise<void>
+  ensureReady:       () => Promise<void>
+  selectModel:       (engineId: EngineId, modelId: string) => Promise<void>
+  loadCatalog:       () => Promise<void>
+  loadInstalled:     () => Promise<void>
+  startPull:         (engineId: EngineId, modelId: string) => Promise<void>
+  pollPullJob:       (jobId: string) => Promise<void>
+  setError:          (error: string | null) => void
 }
 
 export const useRuntimeStore = create<RuntimeState>()(
   persist(
     (set, get) => ({
-      status: 'checking',
-      isOnline: true,
-      models: [],
-      selectedModel: null,
-      isChecking: false,
-      error: null,
+      status:          'checking',
+      engines:         [],
+      selection:       null,
+      installedModels: [],
+      catalogModels:   [],
+      pullJob:         null,
+      isChecking:      false,
+      isPulling:       false,
+      error:           null,
 
-      setStatus: (status) => set({ status }),
-
-      setOnline: (online) => set({ isOnline: online }),
-
-      setModels: (models) => set({ models }),
-
-      selectModel: (modelId) => set({ selectedModel: modelId }),
-
-      setError: (error) => set({ error }),
-
-      checkRuntime: async () => {
-        set({ isChecking: true, error: null })
-
+      refreshStatus: async () => {
         try {
-          const result = await checkRuntime()
-          const models = result.models.map(mapRuntimeModel)
-
-          const currentSelected = get().selectedModel
-          const defaultModel = result.defaultModel ?? null
-
-          // Keep current selection if still available; fall back to
-          // configured default, then first installed model.
-          const selectedModel =
-            currentSelected && models.some((m) => m.id === currentSelected)
-              ? currentSelected
-              : models.some((m) => m.id === defaultModel)
-                ? defaultModel
-                : models.length > 0
-                  ? models[0].id
-                  : null
-
+          const result = await probeRuntime()
+          const models = result.engines.flatMap(e => e.models).map(mapInstalledModel)
           set({
-            status: result.available ? 'running' : 'stopped',
-            models,
-            selectedModel,
-            isChecking: false,
-            error: null,
+            engines:         result.engines,
+            selection:       result.selection,
+            installedModels: models,
+            status:          result.engines.some(e => e.models.length > 0 && e.status === 'running')
+              ? 'ready'
+              : result.engines.some(e => e.status === 'running')
+                ? 'no_models'
+                : 'checking',
           })
-        } catch (error) {
+        } catch {
+          set({ status: 'error', error: 'Failed to probe runtime' })
+        }
+      },
+
+      ensureReady: async () => {
+        set({ status: 'starting', isChecking: true, error: null })
+        try {
+          const result = await ensureRuntimeReady()
+          const models = result.engine.models.map(mapInstalledModel)
           set({
-            status: 'error',
+            status:          result.engine.models.length > 0 ? 'ready' : 'no_models',
+            engines:         [result.engine],
+            installedModels: models,
+            isChecking:      false,
+            error:           null,
+          })
+        } catch (err) {
+          set({
+            status:     'error',
             isChecking: false,
-            error: error instanceof Error ? error.message : 'Failed to reach orchestrator',
+            error:      err instanceof Error ? err.message : 'Failed to start runtime',
           })
         }
-
-        window.addEventListener('online', () => get().setOnline(true))
-        window.addEventListener('offline', () => get().setOnline(false))
       },
+
+      selectModel: async (engineId: EngineId, modelId: string) => {
+        try {
+          const result = await apiSetSelection({ engineId, modelId })
+          set({ selection: result.selection })
+        } catch (err) {
+          set({ error: err instanceof Error ? err.message : 'Failed to select model' })
+        }
+      },
+
+      loadCatalog: async () => {
+        try {
+          const result = await getModelCatalog()
+          set({ catalogModels: result.catalog })
+        } catch (err) {
+          set({ error: err instanceof Error ? err.message : 'Failed to load catalog' })
+        }
+      },
+
+      loadInstalled: async () => {
+        try {
+          const result = await getInstalledModels()
+          set({ installedModels: result.models.map(mapInstalledModel) })
+        } catch (err) {
+          set({ error: err instanceof Error ? err.message : 'Failed to load models' })
+        }
+      },
+
+      startPull: async (engineId: EngineId, modelId: string) => {
+        set({ isPulling: true, error: null })
+        try {
+          const result = await startModelPull(engineId, modelId)
+          set({ pullJob: result.job })
+        } catch (err) {
+          set({
+            isPulling: false,
+            error:     err instanceof Error ? err.message : 'Failed to start pull',
+          })
+        }
+      },
+
+      pollPullJob: async (jobId: string) => {
+        try {
+          const result = await getPullJob(jobId)
+          set({ pullJob: result.job })
+          if (result.job.status === 'complete' || result.job.status === 'failed') {
+            set({ isPulling: false })
+            if (result.job.status === 'complete') {
+              await get().loadInstalled()
+            }
+          }
+        } catch (err) {
+          set({ error: err instanceof Error ? err.message : 'Failed to poll job' })
+        }
+      },
+
+      setError: (error) => set({ error }),
     }),
     {
-      name: 'vigilante-runtime-storage',
+      name:       'vigilante-runtime-storage',
       partialize: (state) => ({
-        selectedModel: state.selectedModel,
+        selection: state.selection,
       }),
     },
   ),

@@ -4,24 +4,23 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Cpu } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useRuntimeStore } from '@/store/useRuntimeStore';
+import { useRuntimeStore, ModelInfo } from '@/store/useRuntimeStore';
 
 interface ModelSelectStepProps {
   onNext: () => void;
 }
 
 export function ModelSelectStep({ onNext }: ModelSelectStepProps) {
-  const { models, selectedModel, selectModel } = useRuntimeStore();
+  const { installedModels, selection, selectModel } = useRuntimeStore();
 
-  const handleSelect = (modelId: string) => {
-    selectModel(modelId);
+  const handleSelect = (model: ModelInfo) => {
+    selectModel(model.engineId, model.id);
   };
 
-  const canContinue = !!selectedModel;
+  const canContinue = !!selection;
 
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto">
-      {/* Heading */}
       <motion.h2
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -40,7 +39,6 @@ export function ModelSelectStep({ onNext }: ModelSelectStepProps) {
         You can change this anytime in settings.
       </motion.p>
 
-      {/* Model Selection List */}
       <motion.div
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -48,41 +46,41 @@ export function ModelSelectStep({ onNext }: ModelSelectStepProps) {
         className="w-full mb-8"
       >
         <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
-          {models.map((model, index) => (
+          {installedModels.map((model, index) => (
             <motion.button
               key={model.id}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.2, delay: 0.2 + index * 0.05, ease: 'easeOut' }}
-              onClick={() => handleSelect(model.id)}
+              onClick={() => handleSelect(model)}
               className={cn(
                 "w-full flex items-center gap-3 p-4 rounded-xl border transition-all relative overflow-hidden",
-                selectedModel === model.id
+                selection?.modelId === model.id
                   ? "bg-accent/5 border-l-4 border-l-accent border-accent/20"
                   : "bg-bg-surface border-border-subtle hover:border-accent/20"
               )}
             >
               <div className={cn(
                 "w-12 h-12 rounded-xl flex items-center justify-center transition-colors",
-                selectedModel === model.id ? "bg-accent" : "bg-bg-elevated"
+                selection?.modelId === model.id ? "bg-accent" : "bg-bg-elevated"
               )}>
                 <Cpu className={cn(
                   "w-6 h-6",
-                  selectedModel === model.id ? "text-bg-base" : "text-text-muted"
+                  selection?.modelId === model.id ? "text-bg-base" : "text-text-muted"
                 )} />
               </div>
               
               <div className="flex-1 text-left">
                 <p className={cn(
                   "text-body-md font-medium",
-                  selectedModel === model.id ? "text-accent" : "text-text-primary"
+                  selection?.modelId === model.id ? "text-accent" : "text-text-primary"
                 )}>
                   {model.name}
                 </p>
-                <p className="text-caption text-text-muted">{model.size}</p>
+                <p className="text-caption text-text-muted">{model.size} • {model.engineId}</p>
               </div>
 
-              {selectedModel === model.id && (
+              {selection?.modelId === model.id && (
                 <motion.div
                   layoutId="selected-indicator"
                   transition={{ type: 'spring', stiffness: 500, damping: 30 }}
@@ -95,7 +93,6 @@ export function ModelSelectStep({ onNext }: ModelSelectStepProps) {
         </div>
       </motion.div>
 
-      {/* Confirm Button */}
       <motion.button
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}

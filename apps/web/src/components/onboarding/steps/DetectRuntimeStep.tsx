@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle2, AlertCircle, Loader2, ExternalLink, Server } from 'lucide-react';
+import { CheckCircle2, Loader2, Sparkles, Server, Cpu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRuntimeStore } from '@/store/useRuntimeStore';
 
@@ -10,63 +10,80 @@ interface DetectRuntimeStepProps {
   onNext: () => void;
 }
 
-interface DetectionRowProps {
-  label: string;
-  status: 'checking' | 'success' | 'error' | 'warning';
-  value?: string;
-  delay: number;
-}
-
-function DetectionRow({ label, status, value, delay }: DetectionRowProps) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.2, delay, ease: 'easeOut' }}
-      className="flex items-center justify-between py-3 border-b border-border-subtle last:border-0"
-    >
-      <span className="text-body-sm text-text-secondary">{label}</span>
-      <div className="flex items-center gap-2">
-        {status === 'checking' && <Loader2 className="w-4 h-4 text-accent animate-spin" />}
-        {status === 'success' && <CheckCircle2 className="w-4 h-4 text-success" />}
-        {status === 'error' && <AlertCircle className="w-4 h-4 text-error" />}
-        {status === 'warning' && <AlertCircle className="w-4 h-4 text-warning" />}
-        {value && (
-          <span className={cn(
-            "text-body-sm font-medium",
-            status === 'success' && "text-success",
-            status === 'error' && "text-error",
-            status === 'warning' && "text-warning",
-            status === 'checking' && "text-text-muted"
-          )}>
-            {value}
-          </span>
-        )}
-      </div>
-    </motion.div>
-  );
-}
-
 export function DetectRuntimeStep({ onNext }: DetectRuntimeStepProps) {
-  const { status, checkRuntime, isOnline, isChecking } = useRuntimeStore();
+  const { status, ensureReady, isChecking, engines, selection } = useRuntimeStore();
 
   useEffect(() => {
-    checkRuntime();
-  }, [checkRuntime]);
+    ensureReady();
+  }, [ensureReady]);
 
-  const isRunning = status === 'running';
-  const canContinue = isRunning;
+  const isReady = status === 'ready';
+  const isCheckingOrStarting = isChecking || status === 'starting';
+
+  const getRunningEngines = () => engines.filter(e => e.status === 'running');
+  const runningEngines = getRunningEngines();
+  const hasInstalledModels = engines.some(e => e.models.length > 0);
+
+  const getStatusContent = () => {
+    if (status === 'checking') {
+      return {
+        title: 'Checking your local runtimes',
+        description: 'Detecting available AI engines on your device.',
+        statusIcon: <Loader2 className="w-6 h-6 text-accent animate-spin" />,
+        statusText: 'Detecting...',
+        cardClass: 'bg-accent/10',
+      };
+    }
+    if (status === 'starting') {
+      return {
+        title: 'Starting local AI',
+        description: 'Getting your local AI assistant ready.',
+        statusIcon: <Loader2 className="w-6 h-6 text-accent animate-spin" />,
+        statusText: 'Starting...',
+        cardClass: 'bg-accent/10',
+      };
+    }
+    if (status === 'ready') {
+      const engineNames = runningEngines.map(e => e.name).join(', ');
+      return {
+        title: "You're all set",
+        description: `Running: ${engineNames}`,
+        statusIcon: <CheckCircle2 className="w-6 h-6 text-success" />,
+        statusText: hasInstalledModels ? `${engines.reduce((sum, e) => sum + e.models.length, 0)} models installed` : 'Ready',
+        cardClass: 'bg-success/10',
+      };
+    }
+    if (status === 'no_models') {
+      const engineNames = runningEngines.map(e => e.name).join(', ');
+      return {
+        title: 'AI engine ready',
+        description: `${engineNames} is running. Choose a model to get started.`,
+        statusIcon: <Sparkles className="w-6 h-6 text-accent" />,
+        statusText: 'No models installed yet',
+        cardClass: 'bg-accent/10',
+      };
+    }
+    // error state
+    return {
+      title: 'Something went wrong',
+      description: 'We couldn\'t detect any local AI runtimes.',
+      statusIcon: <Server className="w-6 h-6 text-error" />,
+      statusText: 'No runtime detected',
+      cardClass: 'bg-error/10',
+    };
+  };
+
+  const content = getStatusContent();
 
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto">
-      {/* Heading */}
       <motion.h2
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2, delay: 0 }}
         className="text-heading-lg text-text-primary mb-2 text-center"
       >
-        Checking your local runtime
+        {content.title}
       </motion.h2>
 
       <motion.p
@@ -75,94 +92,99 @@ export function DetectRuntimeStep({ onNext }: DetectRuntimeStepProps) {
         transition={{ duration: 0.2, delay: 0.1 }}
         className="text-body-sm text-text-secondary mb-8 text-center"
       >
-        Vigilante works best with Ollama installed locally.
+        {content.description}
       </motion.p>
 
-      {/* Detection Card */}
       <motion.div
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.2, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className="w-full bg-bg-surface border border-border-subtle rounded-xl p-5 mb-8"
+        className="w-full bg-bg-surface border border-border-subtle rounded-xl p-6 mb-8"
       >
-        <div className="flex items-center gap-3 mb-4 pb-4 border-b border-border-subtle">
-          <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
-            <Server className="w-5 h-5 text-accent" />
+        <div className="flex items-center gap-4">
+          <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", content.cardClass)}>
+            {content.statusIcon}
           </div>
           <div>
-            <p className="text-body-md font-medium text-text-primary">Ollama Runtime</p>
-            <p className="text-caption text-text-muted">Local AI inference engine</p>
+            <p className="text-body-md font-medium text-text-primary">
+              Local AI Runtime
+            </p>
+            <p className="text-caption text-text-muted">
+              {content.statusText}
+            </p>
           </div>
         </div>
 
-        <DetectionRow
-          label="Server Status"
-          status={isChecking ? 'checking' : isRunning ? 'success' : 'error'}
-          value={isChecking ? 'Checking…' : isRunning ? 'Running' : 'Not running'}
-          delay={0.3}
-        />
-
-        <DetectionRow
-          label="Network"
-          status={isOnline ? 'success' : 'warning'}
-          value={isOnline ? 'Online' : 'Offline'}
-          delay={0.34}
-        />
+        {status === 'ready' && (
+          <div className="mt-4 pt-4 border-t border-border-subtle flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-success" />
+            <span className="text-caption text-text-muted">
+              {selection ? `Using ${selection.modelId}` : 'Ready to use'}
+            </span>
+          </div>
+        )}
       </motion.div>
 
-      {/* Actions */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.2, delay: 0.5 }}
-        className="flex flex-col gap-3 w-full max-w-[280px] mx-auto"
+        className="w-full max-w-[280px] mx-auto"
       >
-        {!isRunning && (
-          <a
-            href="https://ollama.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(
-              "flex items-center justify-center gap-2 w-full py-2.5 rounded-lg",
-              "bg-bg-elevated border border-border-subtle",
-              "hover:border-accent/30 transition-colors",
-              "text-body-sm text-text-secondary"
-            )}
-          >
-            Download Ollama
-            <ExternalLink className="w-4 h-4" />
-          </a>
-        )}
-
-        <div className="flex gap-3">
-          {!isRunning && (
-            <button
-              onClick={() => checkRuntime()}
-              disabled={isChecking}
-              className={cn(
-                "flex-1 py-2.5 rounded-lg",
-                "bg-bg-elevated border border-border-subtle",
-                "hover:border-accent/30 transition-colors",
-                "text-body-sm text-text-secondary"
-              )}
-            >
-              Check Again
-            </button>
-          )}
-
+        {status === 'no_models' ? (
           <button
             onClick={onNext}
-            disabled={!canContinue}
             className={cn(
-              "flex-1 py-2.5 rounded-lg",
+              "flex items-center justify-center gap-2 w-full py-3 rounded-lg",
               "bg-accent text-bg-base font-medium",
-              "hover:bg-accent-hover transition-colors",
-              !canContinue && "opacity-50 cursor-not-allowed"
+              "hover:bg-accent-hover transition-colors"
             )}
           >
-            Continue
+            Choose a Model
           </button>
-        </div>
+        ) : status === 'ready' ? (
+          <button
+            onClick={onNext}
+            className={cn(
+              "flex items-center justify-center gap-2 w-full py-3 rounded-lg",
+              "bg-accent text-bg-base font-medium",
+              "hover:bg-accent-hover transition-colors"
+            )}
+          >
+            Get Started
+          </button>
+        ) : status === 'error' ? (
+          <button
+            onClick={onNext}
+            className={cn(
+              "flex items-center justify-center gap-2 w-full py-3 rounded-lg",
+              "bg-accent text-bg-base font-medium",
+              "hover:bg-accent-hover transition-colors"
+            )}
+          >
+            Browse Models
+          </button>
+        ) : (
+          <button
+            onClick={() => ensureReady()}
+            disabled={isCheckingOrStarting}
+            className={cn(
+              "flex items-center justify-center gap-2 w-full py-3 rounded-lg",
+              "bg-accent text-bg-base font-medium",
+              "hover:bg-accent-hover transition-colors",
+              isCheckingOrStarting && "opacity-70 cursor-not-allowed"
+            )}
+          >
+            {isCheckingOrStarting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Please wait...
+              </>
+            ) : (
+              'Try Again'
+            )}
+          </button>
+        )}
       </motion.div>
     </div>
   );

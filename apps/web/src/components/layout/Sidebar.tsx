@@ -56,11 +56,8 @@ export function Sidebar() {
       transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
       className="h-full bg-bg-surface border-r border-border-strong flex flex-col shrink-0 z-10 relative overflow-hidden"
     >
-      {/* Top region (drag area for Tauri) */}
-      <div className="h-6 w-full shrink-0 absolute top-0 left-0" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
-
       {/* Main sidebar content wrapper */}
-      <div className="flex flex-col flex-1 h-full w-[260px] pt-6">
+      <div className="flex flex-col flex-1 h-full w-[260px]">
         <SidebarHeader />
         
         <SidebarNav activeTab={derivedActiveTab} setActiveTab={setActiveTab} />

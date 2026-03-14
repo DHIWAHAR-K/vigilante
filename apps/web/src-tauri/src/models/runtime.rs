@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 /// Cached result of an Ollama probe — written to `cache/runtime-status.json`.
-/// The frontend considers this stale after 30 seconds and re-requests via `check_runtime`.
+/// The frontend considers this stale after 30 seconds and re-requests via `probe_runtime`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OllamaRuntimeStatus {
@@ -25,6 +25,15 @@ impl Default for OllamaRuntimeStatus {
     }
 }
 
+/// The health state of the Ollama runtime.
+///
+/// State machine (from the frontend's perspective):
+///   Unknown      → initial / cold-cache state, always re-probe
+///   NotInstalled → show "Install Ollama" instructions; no recovery possible
+///   Stopped      → Ollama binary present but process not running; offer auto-start
+///   Available    → process running, but no models downloaded; offer model pull
+///   Running      → at least one model present; app is fully operational
+///   Error        → process responded with an unexpected status; show error detail
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum OllamaStatus {
@@ -34,12 +43,41 @@ pub enum OllamaStatus {
     Running,
     /// Ollama is reachable but no models are installed.
     Available,
-    /// Ollama process is not responding.
+    /// Ollama binary exists on disk but the process is not responding.
     Stopped,
-    /// Ollama binary is not installed on this machine.
+    /// Ollama binary is not present on this machine.
     NotInstalled,
-    /// Probe returned an unexpected error.
+    /// Probe returned an unexpected HTTP error.
     Error,
+}
+
+/// What happened when `ensure_runtime_ready` tried to get Ollama running.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum StartOutcome {
+    /// Ollama was already running when we checked — nothing needed.
+    AlreadyRunning,
+    /// We launched `ollama serve` and it became healthy within the timeout.
+    Started,
+    /// Binary not found on disk — user must install Ollama.
+    NotInstalled,
+    /// We launched the process but it never became healthy before the timeout.
+    Timeout,
+    /// The launch command itself failed (permissions, exec error, etc.).
+    Failed,
+}
+
+/// Result returned by `ensure_runtime_ready`.
+/// Bundles the final probed status with metadata about what the native layer did.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnsureReadyResult {
+    /// Current runtime status after the ensure attempt.
+    pub runtime: OllamaRuntimeStatus,
+    /// Whether the native layer attempted to start Ollama.
+    pub start_attempted: bool,
+    /// What the start attempt resolved to (None if no attempt was made).
+    pub start_outcome: Option<StartOutcome>,
 }
 
 /// Summary of an installed Ollama model.

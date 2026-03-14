@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Cpu, CheckCircle2, AlertCircle, Loader2, ExternalLink, RefreshCw } from 'lucide-react';
+import { X, Cpu, CheckCircle2, Loader2, RefreshCw, Sparkles, Server } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRuntimeStore, ModelInfo } from '@/store/useRuntimeStore';
 import { slideInVariants, staggerContainer, listItemVariants, TRANSITIONS } from '@/lib/motion-config';
@@ -54,64 +54,45 @@ function ModelCard({ model, isSelected, onSelect }: { model: ModelInfo; isSelect
   );
 }
 
-function StatusSection({
-  icon: Icon,
-  label,
-  value,
-  status,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  status?: 'success' | 'warning' | 'error';
-}) {
-  const statusStyles = {
-    success: 'text-success',
-    warning: 'text-warning',
-    error: 'text-error',
-  };
-
-  return (
-    <div className="flex items-center gap-3">
-      <div className="w-8 h-8 rounded-lg bg-bg-elevated flex items-center justify-center">
-        <Icon className={cn("w-4 h-4", status ? statusStyles[status] : "text-text-muted")} />
-      </div>
-      <div>
-        <p className="text-caption text-text-muted">{label}</p>
-        <p className={cn("text-body-sm", status ? statusStyles[status] : "text-text-primary")}>
-          {value}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 export function RuntimeCenter({ isOpen, onClose }: RuntimeCenterProps) {
   const {
     status,
-    isOnline,
-    models,
-    selectedModel,
+    installedModels,
+    engines,
+    selection,
     selectModel,
-    checkRuntime,
+    refreshStatus,
     isChecking,
   } = useRuntimeStore();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Refresh status when the panel opens. The user is already in the app at
+  // this point so we use a silent probe — not the full ensure lifecycle.
   useEffect(() => {
     if (isOpen) {
-      checkRuntime();
+      refreshStatus();
     }
   }, [isOpen]);
 
-  const handleCheck = async () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    await checkRuntime();
+    await refreshStatus();
     setIsRefreshing(false);
   };
 
-  const isRunning = status === 'running';
+  const isReady = status === 'ready' || status === 'no_models';
+
+  const getStatusText = () => {
+    switch (status) {
+      case 'checking': return 'Checking...';
+      case 'starting': return 'Starting...';
+      case 'ready': return 'Ready';
+      case 'no_models': return 'Ready (no models)';
+      case 'error': return 'Error';
+      default: return 'Unknown';
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -139,8 +120,8 @@ export function RuntimeCenter({ isOpen, onClose }: RuntimeCenterProps) {
             {/* Header */}
             <div className="flex items-center justify-between p-5 border-b border-border-subtle">
               <div>
-                <h2 className="text-heading-sm font-medium text-text-primary">Local Runtime</h2>
-                <p className="text-caption text-text-muted mt-0.5">Ollama & model management</p>
+                <h2 className="text-heading-sm font-medium text-text-primary">AI Settings</h2>
+                <p className="text-caption text-text-muted mt-0.5">Local AI configuration</p>
               </div>
               <button
                 onClick={onClose}
@@ -152,40 +133,55 @@ export function RuntimeCenter({ isOpen, onClose }: RuntimeCenterProps) {
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-5 space-y-6">
-              {/* Status Cards */}
+              {/* Status Card */}
               <motion.div
-                variants={staggerContainer}
-                initial="hidden"
-                animate="visible"
-                className="grid grid-cols-2 gap-3"
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className={cn(
+                  "p-5 rounded-xl border",
+                  isReady
+                    ? "bg-success/5 border-success/20"
+                    : status === 'checking' || status === 'starting'
+                      ? "bg-accent/5 border-accent/20"
+                      : "bg-warning/5 border-warning/20"
+                )}
               >
-                <motion.div variants={listItemVariants} className="p-4 rounded-lg bg-bg-elevated border border-border-subtle">
-                  <StatusSection
-                    icon={Cpu}
-                    label="Ollama"
-                    value={isRunning ? 'Running' : status === 'stopped' ? 'Stopped' : status === 'error' ? 'Error' : 'Checking…'}
-                    status={isRunning ? 'success' : status === 'error' ? 'error' : 'warning'}
-                  />
-                </motion.div>
-
-                <motion.div variants={listItemVariants} className="p-4 rounded-lg bg-bg-elevated border border-border-subtle">
-                  <StatusSection
-                    icon={isOnline ? CheckCircle2 : AlertCircle}
-                    label="Network"
-                    value={isOnline ? 'Online' : 'Offline'}
-                    status={isOnline ? 'success' : 'warning'}
-                  />
-                </motion.div>
+                <div className="flex items-center gap-4">
+                  <div className={cn(
+                    "w-12 h-12 rounded-xl flex items-center justify-center",
+                    isReady
+                      ? "bg-success/10"
+                      : status === 'checking' || status === 'starting'
+                        ? "bg-accent/10"
+                        : "bg-warning/10"
+                  )}>
+                    {status === 'checking' || status === 'starting' ? (
+                      <Loader2 className="w-6 h-6 text-accent animate-spin" />
+                    ) : isReady ? (
+                      <CheckCircle2 className="w-6 h-6 text-success" />
+                    ) : (
+                      <Server className="w-6 h-6 text-warning" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-body-md font-medium text-text-primary">
+                      Local AI Runtime
+                    </p>
+                    <p className="text-caption text-text-muted">
+                      {getStatusText()}
+                    </p>
+                  </div>
+                </div>
               </motion.div>
 
               {/* Models Section */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-body-sm font-medium text-text-primary">Installed Models</h3>
+                  <h3 className="text-body-sm font-medium text-text-primary">Models</h3>
                   <button
-                    onClick={handleCheck}
-                    disabled={isRefreshing}
-                    className="flex items-center gap-1.5 text-caption text-accent hover:text-accent-hover transition-colors"
+                    onClick={handleRefresh}
+                    disabled={isRefreshing || status === 'checking'}
+                    className="flex items-center gap-1.5 text-caption text-accent hover:text-accent-hover transition-colors disabled:opacity-50"
                   >
                     <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
                     Refresh
@@ -196,19 +192,14 @@ export function RuntimeCenter({ isOpen, onClose }: RuntimeCenterProps) {
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 text-accent animate-spin" />
                   </div>
-                ) : !isRunning ? (
-                  <div className="p-4 rounded-lg bg-warning/10 border border-warning/20">
-                    <p className="text-body-sm text-warning">
-                      Ollama is not running.{' '}
-                      <a
-                        href="https://ollama.com"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline inline-flex items-center gap-1"
-                      >
-                        Install Ollama <ExternalLink className="w-3 h-3" />
-                      </a>
-                      {' '}or run <code className="bg-bg-elevated px-1 rounded">ollama serve</code>.
+                ) : installedModels.length === 0 ? (
+                  <div className="p-6 rounded-lg bg-bg-elevated border border-border-subtle text-center">
+                    <Sparkles className="w-8 h-8 text-text-muted mx-auto mb-3" />
+                    <p className="text-body-sm text-text-secondary mb-1">
+                      No models installed
+                    </p>
+                    <p className="text-caption text-text-muted">
+                      Download a model to get started
                     </p>
                   </div>
                 ) : (
@@ -218,12 +209,12 @@ export function RuntimeCenter({ isOpen, onClose }: RuntimeCenterProps) {
                     animate="visible"
                     className="space-y-2"
                   >
-                    {models.map((model) => (
+                    {installedModels.map((model) => (
                       <ModelCard
                         key={model.id}
                         model={model}
-                        isSelected={model.id === selectedModel}
-                        onSelect={() => selectModel(model.id)}
+                        isSelected={selection?.modelId === model.id}
+                        onSelect={() => selectModel(model.engineId, model.id)}
                       />
                     ))}
                   </motion.div>
@@ -231,24 +222,30 @@ export function RuntimeCenter({ isOpen, onClose }: RuntimeCenterProps) {
               </div>
 
               {/* Selected Model Info */}
-              {selectedModel && (
+              {selection && installedModels.length > 0 && (
                 <div className="p-4 rounded-lg bg-accent/5 border border-accent/20">
-                  <p className="text-caption text-accent mb-1">Active Model</p>
+                  <p className="text-caption text-accent mb-1">Currently Using</p>
                   <p className="text-body-md font-medium text-text-primary">
-                    {models.find(m => m.id === selectedModel)?.name || selectedModel}
+                    {installedModels.find(m => m.id === selection.modelId)?.name || selection.modelId}
                   </p>
                   <p className="text-caption text-text-muted mt-1">
-                    {models.find(m => m.id === selectedModel)?.size} • Local inference
+                    {installedModels.find(m => m.id === selection.modelId)?.size} • {selection.engineId}
                   </p>
                 </div>
               )}
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-border-subtle">
+            <div className="p-4 border-t border-border-subtle flex gap-2">
+              <button
+                onClick={() => { window.location.href = '/settings'; }}
+                className="flex-1 py-2.5 rounded-lg bg-accent text-bg-base hover:bg-accent-hover text-body-sm transition-colors text-center"
+              >
+                Manage Models
+              </button>
               <button
                 onClick={onClose}
-                className="w-full py-2.5 rounded-lg bg-bg-elevated hover:bg-border-subtle text-body-sm transition-colors"
+                className="px-4 py-2.5 rounded-lg bg-bg-elevated hover:bg-border-subtle text-body-sm transition-colors"
               >
                 Done
               </button>

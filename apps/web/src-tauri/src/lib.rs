@@ -84,10 +84,12 @@ pub fn run() {
             // messages
             commands::messages::add_message_cmd,
             commands::messages::update_message_content_cmd,
-            // runtime
-            commands::runtime::check_runtime,
-            commands::runtime::get_cached_runtime_status,
-            commands::runtime::list_models,
+            // runtime — see commands/runtime.rs for full tier documentation
+            commands::runtime::get_cached_runtime_status,  // tier 1: instant cache
+            commands::runtime::list_models,                 // tier 1: instant cache
+            commands::runtime::probe_runtime,               // tier 2: HTTP probe only
+            commands::runtime::ensure_runtime_ready,        // tier 3: launch + auto-start
+            commands::runtime::start_ollama_if_installed,   // supplemental: fire-and-forget
             // activity + export
             commands::activity::list_activity,
             commands::activity::export_thread_cmd,

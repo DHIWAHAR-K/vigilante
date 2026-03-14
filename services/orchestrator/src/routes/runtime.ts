@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { registry } from '../providers'
-import { config } from '../config'
+import { runtimeManager }            from '../services/runtime-manager'
+import type { EngineId, RuntimeSelection } from '../types/runtime'
 
 export const runtimeRoutes = new Hono()
 
@@ -8,93 +8,112 @@ export const runtimeRoutes = new Hono()
 
 runtimeRoutes.get('/health', (c) =>
   c.json({
-    status: 'ok',
-    version: '0.1.0',
+    status:    'ok',
+    version:   '0.1.0',
     timestamp: new Date().toISOString(),
   }),
 )
 
-// ─── Providers ────────────────────────────────────────────────────────────────
+// ─── GET /api/runtime/status ──────────────────────────────────────────────────
+//
+//  Probe all registered engines and return their state + the current selection.
+//  Replaces the old Ollama-only probe with an engine-neutral aggregate view.
+//
+//  Response: { engines: RuntimeEngine[], selection: RuntimeSelection | null, probedAt }
 
-/**
- * List all registered providers with their availability status.
- * Availability is checked in parallel — each provider gets a 3s timeout
- * (handled inside the provider's isAvailable() implementation).
- */
-runtimeRoutes.get('/providers', async (c) => {
-  const providers = registry.list()
-
-  const statuses = await Promise.all(
-    providers.map(async (p) => ({
-      id: p.id,
-      name: p.name,
-      type: p.type,
-      available: await p.isAvailable(),
-    })),
-  )
-
-  return c.json({ providers: statuses })
-})
-
-/**
- * Test connectivity to a specific provider.
- * POST /api/providers/test  { "id": "ollama" }
- */
-runtimeRoutes.post('/providers/test', async (c) => {
-  const { id } = await c.req.json<{ id?: string }>()
-  if (!id) return c.json({ error: '`id` is required' }, 400)
-
-  if (!registry.has(id)) {
-    return c.json({ error: `Provider "${id}" is not registered` }, 404)
-  }
-
-  const provider = registry.getOrThrow(id)
-  const available = await provider.isAvailable()
-  return c.json({ id, available })
-})
-
-// ─── Models ───────────────────────────────────────────────────────────────────
-
-/**
- * List models for a given provider.
- * GET /api/models?provider=ollama
- */
-runtimeRoutes.get('/models', async (c) => {
-  const providerId = c.req.query('provider') ?? 'ollama'
-
-  if (!registry.has(providerId)) {
-    return c.json({ error: `Provider "${providerId}" is not registered` }, 404)
-  }
-
-  const provider = registry.getOrThrow(providerId)
-
-  try {
-    const models = await provider.listModels()
-    return c.json({ provider: providerId, models, defaultModel: config.defaultModel })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    return c.json({ error: `Failed to list models: ${message}` }, 502)
-  }
-})
-
-/**
- * Quick runtime status — is Ollama up and which models are installed?
- * The frontend polls this on mount to show the RuntimeStatusChip.
- * GET /api/runtime/status
- */
 runtimeRoutes.get('/runtime/status', async (c) => {
-  const ollama = registry.get('ollama')
-  if (!ollama) {
-    return c.json({ available: false, models: [], defaultModel: null })
+  const engines = await runtimeManager.probeAll()
+  return c.json({
+    engines,
+    selection: runtimeManager.getSelection(),
+    probedAt:  new Date().toISOString(),
+  })
+})
+
+// ─── POST /api/runtime/ensure ─────────────────────────────────────────────────
+//
+//  Ensure the selected (or default) engine is running.
+//  Semantics are unchanged from before; response shape is now engine-neutral.
+//
+//  Response: { engine: RuntimeEngine, startAttempted: boolean, outcome: EnsureOutcome }
+
+runtimeRoutes.post('/runtime/ensure', async (c) => {
+  const result = await runtimeManager.ensureReady()
+  return c.json(result)
+})
+
+// ─── GET /api/runtime/engines ─────────────────────────────────────────────────
+//
+//  List all registered runtime engines with their probed status.
+//  Use this to build the engine picker UI.
+//
+//  Response: { engines: RuntimeEngine[] }
+
+runtimeRoutes.get('/runtime/engines', async (c) => {
+  const engines = await runtimeManager.probeAll()
+  return c.json({ engines })
+})
+
+// ─── POST /api/runtime/select ─────────────────────────────────────────────────
+//
+//  Set the active engine + model.  Persisted to disk so it survives restarts.
+//  Subsequent /api/query calls route through this selection.
+//
+//  Body:     { engineId: string, modelId: string }
+//  Response: { selection: RuntimeSelection }
+
+runtimeRoutes.post('/runtime/select', async (c) => {
+  let body: { engineId?: string; modelId?: string }
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400)
   }
 
-  const available = await ollama.isAvailable()
-  const models = available ? await ollama.listModels() : []
+  const { engineId, modelId } = body
+  if (!engineId || !modelId) {
+    return c.json({ error: '`engineId` and `modelId` are required' }, 400)
+  }
 
+  if (!runtimeManager.getAdapter(engineId as EngineId)) {
+    return c.json({ error: `Unknown engine: ${engineId}` }, 400)
+  }
+
+  const selection: RuntimeSelection = { engineId: engineId as EngineId, modelId }
+  runtimeManager.setSelection(selection)
+  return c.json({ selection })
+})
+
+// ─── GET /api/runtime/selection ───────────────────────────────────────────────
+//
+//  Return the persisted engine+model selection (null if none saved yet).
+
+runtimeRoutes.get('/runtime/selection', (c) => {
+  return c.json({ selection: runtimeManager.getSelection() })
+})
+
+// ─── Backward-compatibility shims ─────────────────────────────────────────────
+//
+//  Kept so existing frontend code that still calls the old endpoints doesn't break.
+
+// GET /api/models — merged list of all installed models across all engines
+runtimeRoutes.get('/models', async (c) => {
+  const engines = await runtimeManager.probeAll()
   return c.json({
-    available,
-    provider: 'ollama',
-    models,
-    defaultModel: config.defaultModel,
+    models:    engines.flatMap(e => e.models),
+    selection: runtimeManager.getSelection(),
+  })
+})
+
+// GET /api/providers — one entry per engine (legacy field names)
+runtimeRoutes.get('/providers', async (c) => {
+  const engines = await runtimeManager.probeAll()
+  return c.json({
+    providers: engines.map(e => ({
+      id:        e.id,
+      name:      e.name,
+      type:      'local',
+      available: e.status === 'running',
+    })),
   })
 })

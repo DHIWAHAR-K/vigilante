@@ -49,11 +49,11 @@ export function ConversationWorkspace() {
   // Show conversation only when there's an active conversation WITH messages
   const showConversation = hasMessages && activeConversationId !== null;
   const hasActiveConversation = activeConversationId !== null;
-  const { status, selectedModel, checkRuntime } = useRuntimeStore();
+  const { status, selection, refreshStatus } = useRuntimeStore();
 
-  // Initialize runtime on mount
+  // Refresh runtime status on mount (user is already in the app).
   useEffect(() => {
-    checkRuntime();
+    refreshStatus();
   }, []);
 
   const handleToken = useCallback((token: string) => {
@@ -142,7 +142,7 @@ export function ConversationWorkspace() {
     addMessage(conversationId!, userMessage);
     setDraftInput('');
 
-    submitQuery(query, conversationId ?? null, selectedModel);
+    submitQuery(query, conversationId ?? null, selection?.engineId ?? null, selection?.modelId ?? null);
   }, [
     activeConversationId,
     isDraftMode,
@@ -150,7 +150,7 @@ export function ConversationWorkspace() {
     addMessage,
     setDraftInput,
     isSubmitting,
-    selectedModel,
+    selection,
     submitQuery,
   ]);
 

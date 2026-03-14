@@ -17,9 +17,8 @@ interface QueryInputProps {
 }
 
 export function QueryInput({ onSubmit, disabled = false }: QueryInputProps) {
-  const setProviderSelectorOpen = useUIStore(s => s.setProviderSelectorOpen);
-  const { isSidebarCollapsed, toggleSidebar } = useUIStore();
-  const { selectedModel, status, models } = useRuntimeStore();
+  const { isSidebarCollapsed, toggleSidebar, setRuntimeCenterOpen } = useUIStore();
+  const { selection, status, installedModels } = useRuntimeStore();
   
   const [query, setQuery] = useState('');
   const [lastQuery, setLastQuery] = useState('');
@@ -136,7 +135,7 @@ export function QueryInput({ onSubmit, disabled = false }: QueryInputProps) {
 
   const handleSubmit = () => {
     if (!isReady || disabled) return;
-    if (!selectedModel && models.length === 0) return;
+    if (!selection && installedModels.length === 0) return;
     
     setIsSubmitting(true);
     if (query.trim()) setLastQuery(query.trim());
@@ -311,19 +310,19 @@ export function QueryInput({ onSubmit, disabled = false }: QueryInputProps) {
           {/* Right Actions */}
           <div className="flex items-center gap-2">
             <button 
-              onClick={(e) => { e.stopPropagation(); setProviderSelectorOpen(true); }}
+              onClick={(e) => { e.stopPropagation(); setRuntimeCenterOpen(true); }}
               className="flex items-center gap-2 px-2.5 h-6 rounded bg-bg-elevated hover:bg-border-subtle transition-colors relative"
               title="Select Model (Cmd+Shift+S)"
             >
               <div className={cn(
                 "w-1.5 h-1.5 rounded-full",
-                status === 'running'
+                status === 'ready'
                   ? "bg-success shadow-[0_0_8px_rgba(52,211,153,0.4)]"
                   : "bg-warning"
               )} />
               <span className="text-mono-xs text-accent">
-                {selectedModel 
-                  ? models.find(m => m.id === selectedModel)?.name.split(':')[0] || selectedModel.split(':')[0]
+                {selection 
+                  ? installedModels.find(m => m.id === selection.modelId)?.name.split(':')[0] || selection.modelId.split(':')[0]
                   : 'Select Model'}
               </span>
 
