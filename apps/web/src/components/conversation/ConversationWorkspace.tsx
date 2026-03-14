@@ -13,6 +13,7 @@ import { RuntimeStatusChip } from '@/components/runtime/RuntimeStatusChip';
 import { useRuntimeStore } from '@/store/useRuntimeStore';
 import { useQueryStream, generateId } from '@/lib/hooks/useQueryStream';
 import { conversationStateVariants, TRANSITIONS } from '@/lib/motion-config';
+import { useRouter } from 'next/navigation';
 
 function generateTitle(content: string): string {
   const firstLine = content.split('\n')[0];
@@ -20,6 +21,7 @@ function generateTitle(content: string): string {
 }
 
 export function ConversationWorkspace() {
+  const router = useRouter();
   const {
     activeConversationId,
     conversations,
@@ -29,7 +31,6 @@ export function ConversationWorkspace() {
     addMessage,
   } = useConversationStore();
 
-  const { setRuntimeCenterOpen } = useUIStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const [streamingSources, setStreamingSources] = useState<Source[]>([]);
@@ -184,11 +185,11 @@ export function ConversationWorkspace() {
           )}
         </div>
 
-        <RuntimeStatusChip onClick={() => setRuntimeCenterOpen(true)} />
+        <RuntimeStatusChip onClick={() => router.push('/settings')} />
       </div>
 
       <AnimatePresence mode="wait">
-        {hasActiveConversation ? (
+        {showConversation ? (
           <motion.div
             key="conversation"
             variants={conversationStateVariants}

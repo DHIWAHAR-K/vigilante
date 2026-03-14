@@ -80,8 +80,7 @@ queryRoutes.post('/query', async (c) => {
         {
           error:
             'No runtime engine is selected. ' +
-            'Call POST /api/runtime/select with { engineId, modelId } first, ' +
-            'or install Ollama for automatic default selection.',
+            'Open Settings, pick a model, and make sure the engine is running.',
         },
         503,
       )

@@ -1,6 +1,5 @@
 import React from 'react';
-import { createPortal } from 'react-dom';
-import { MoreHorizontal, Edit2, Trash2, Download, Archive } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog';
@@ -15,26 +14,7 @@ interface ConversationItemProps {
 
 export function ConversationItem({ item, onDelete, onSelect, isActive }: ConversationItemProps) {
   const [isHovered, setIsHovered] = React.useState(false);
-  const [menuOpen, setMenuOpen] = React.useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
-  const [dropdownPos, setDropdownPos] = React.useState({ top: 0, right: 0 });
-  const triggerRef = React.useRef<HTMLButtonElement>(null);
-  const dropdownRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    if (!menuOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
-        triggerRef.current && !triggerRef.current.contains(e.target as Node)
-      ) {
-        setMenuOpen(false);
-        setIsHovered(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [menuOpen]);
 
   const handleClick = () => {
     if (onSelect) {
@@ -44,7 +24,6 @@ export function ConversationItem({ item, onDelete, onSelect, isActive }: Convers
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setMenuOpen(false);
     setShowDeleteConfirm(true);
   };
 
@@ -54,7 +33,7 @@ export function ConversationItem({ item, onDelete, onSelect, isActive }: Convers
     }
   };
 
-  const showActions = isHovered || menuOpen;
+  const showActions = isHovered;
 
   const formatTime = (date: Date) => {
     const now = new Date();
@@ -76,7 +55,7 @@ export function ConversationItem({ item, onDelete, onSelect, isActive }: Convers
     <div
       className="relative flex items-center group w-full"
       onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => { if (!menuOpen) setIsHovered(false); }}
+      onMouseLeave={() => setIsHovered(false)}
     >
       <DeleteConfirmationDialog
         isOpen={showDeleteConfirm}
@@ -124,56 +103,15 @@ export function ConversationItem({ item, onDelete, onSelect, isActive }: Convers
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.1 }}
-            className="absolute right-0 inset-y-0 flex items-center z-10"
+            className="absolute right-0 inset-y-0 flex items-center gap-1 z-10"
           >
             <button
-              ref={triggerRef}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!menuOpen && triggerRef.current) {
-                  const rect = triggerRef.current.getBoundingClientRect();
-                  setDropdownPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
-                }
-                setMenuOpen(prev => !prev);
-              }}
-              className={cn(
-                "w-8 h-full flex items-center justify-center rounded-md transition-colors cursor-pointer",
-                menuOpen
-                  ? "text-text-primary bg-bg-elevated"
-                  : "text-text-muted hover:text-text-primary hover:bg-border-subtle bg-bg-surface md:bg-transparent md:group-hover:bg-bg-elevated"
-              )}
+              onClick={handleDeleteClick}
+              className="w-8 h-full flex items-center justify-center rounded-md transition-colors cursor-pointer text-text-muted hover:text-error hover:bg-error-subtle"
+              title="Delete conversation"
             >
-              <MoreHorizontal className="w-3.5 h-3.5" />
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
-
-            {menuOpen && createPortal(
-              <div
-                ref={dropdownRef}
-                style={{ position: 'fixed', top: dropdownPos.top, right: dropdownPos.right }}
-                className="w-36 bg-bg-surface border border-border-strong rounded-lg shadow-shadow-md py-1 z-[200]"
-              >
-                <button className="w-full flex items-center gap-2 px-3 py-1.5 text-caption text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors">
-                  <Edit2 className="w-3 h-3" /> Rename
-                </button>
-                <button className="w-full flex items-center gap-2 px-3 py-1.5 text-caption text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors">
-                  <Download className="w-3 h-3" /> Share
-                </button>
-                <button className="w-full flex items-center gap-2 px-3 py-1.5 text-caption text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors">
-                  <Archive className="w-3 h-3" /> Archive
-                </button>
-                <button className="w-full flex items-center gap-2 px-3 py-1.5 text-caption text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors">
-                  <Download className="w-3 h-3" /> Export
-                </button>
-                <div className="h-[1px] w-full bg-border-subtle my-1" />
-                <button
-                  onClick={handleDeleteClick}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-caption text-error hover:bg-error-subtle transition-colors"
-                >
-                  <Trash2 className="w-3 h-3" /> Delete
-                </button>
-              </div>,
-              document.body
-            )}
           </motion.div>
         )}
       </AnimatePresence>

@@ -45,15 +45,17 @@ function listInstalledModels(): InstalledModel[] {
         const filePath = join(MODELS_DIR, f)
         let sizeBytes  = 0
         try { sizeBytes = statSync(filePath).size } catch { /* ignore */ }
-        // Extract quantization from filename, e.g. "model-Q4_K_M.gguf"
-        const qMatch = f.match(/[_-](Q\d[_A-Z]*)\.gguf$/i)
+        // Extract parameter size ("3B", "7B", "13B") and quantization ("Q4_K_M") from filename.
+        // e.g. "Llama-3.2-3B-Instruct-Q4_K_M.gguf" → parameterSize "3B", quantization "Q4_K_M"
+        const qMatch     = f.match(/[_-](Q\d[_A-Z]*)\.gguf$/i)
+        const paramMatch = f.match(/[_-](\d+(?:\.\d+)?B)[_-]/i)
         return {
           id:            filePath,          // path is the stable ID for file-based models
           name:          f.replace(/\.gguf$/i, ''),
           engineId:      'llama.cpp' as EngineId,
           format:        'gguf' as const,
           sizeBytes,
-          parameterSize: null,
+          parameterSize: paramMatch?.[1]?.toUpperCase() ?? null,
           quantization:  qMatch?.[1] ?? null,
           path:          filePath,
         }
@@ -73,9 +75,13 @@ function listInstalledModels(): InstalledModel[] {
  * Server:      OpenAI-compatible HTTP API on :8080 (LLAMA_CPP_PORT to override).
  * Pull:        downloads a GGUF file from a direct HTTPS URL to the models dir.
  *
- * To start the server the adapter uses the first available model.
- * For production use, call POST /api/runtime/select to choose the active model,
- * then POST /api/runtime/ensure to (re)start the server with that model.
+ * Model ID convention: the InstalledModel.id (and RuntimeSelection.modelId) for
+ * llama.cpp is the ABSOLUTE FILE PATH to the .gguf file. Pass this path to
+ * startWithModel() and to removeModel().
+ *
+ * When RuntimeManager has a model selection, it calls startWithModel(modelPath)
+ * directly. The generic ensure() is used only as a fallback (starts with the
+ * first available model) when no explicit selection exists.
  */
 export class LlamaCppAdapter implements IRuntimeAdapter {
   readonly engineId:   EngineId = 'llama.cpp'
@@ -155,6 +161,51 @@ export class LlamaCppAdapter implements IRuntimeAdapter {
       this.serverProcess?.kill('SIGTERM')
       this.serverProcess = spawn(binary, [
         '--model',    firstModel.path,
+        '--port',     String(SERVER_PORT),
+        '--host',     '127.0.0.1',
+        '--ctx-size', '4096',
+      ], { detached: false, stdio: 'ignore' })
+    } catch {
+      const engine = await this.probe()
+      return { outcome: 'failed', engine }
+    }
+
+    // Poll up to 30 s (60 × 500 ms).
+    let healthy = false
+    for (let i = 0; i < 60; i++) {
+      await new Promise(r => setTimeout(r, 500))
+      try {
+        const res = await fetch(`${SERVER_URL}/health`, { signal: AbortSignal.timeout(1_000) })
+        if (res.ok) { healthy = true; break }
+      } catch { /* keep polling */ }
+    }
+
+    const engine = await this.probe()
+    return { outcome: healthy ? 'started' : 'timeout', engine }
+  }
+
+  /**
+   * Start the llama.cpp server with a specific GGUF model path.
+   * Called by RuntimeManager when a model is explicitly selected in Settings.
+   * Kills any previously running server process before starting the new one.
+   *
+   * @param modelPath - Absolute path to the .gguf file (same as InstalledModel.id).
+   */
+  async startWithModel(modelPath: string): Promise<{
+    outcome: 'started' | 'not_installed' | 'timeout' | 'failed'
+    engine:  RuntimeEngine
+  }> {
+    const binary = findBinary()
+    if (!binary) {
+      const engine = await this.probe()
+      return { outcome: 'not_installed', engine }
+    }
+
+    this.serverProcess?.kill('SIGTERM')
+
+    try {
+      this.serverProcess = spawn(binary, [
+        '--model',    modelPath,
         '--port',     String(SERVER_PORT),
         '--host',     '127.0.0.1',
         '--ctx-size', '4096',

@@ -15,18 +15,10 @@ interface SidebarFooterProps {
 export function SidebarFooter({ isSidebarCollapsed, isOnline }: SidebarFooterProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { createConversationFromDraft, openConversation } = useConversationStore();
+  const { createConversationFromDraft, openConversation, startDraftThread } = useConversationStore();
 
   const handleActivityClick = () => {
-    // Create a new conversation directly
-    const newConv = createConversationFromDraft('New Chat');
-    openConversation(newConv.id);
-    // Navigate to home
-    if (window.location.pathname === '/') {
-      window.location.reload();
-    } else {
-      window.location.replace('/');
-    }
+    startDraftThread();
   };
 
   if (isSidebarCollapsed) {

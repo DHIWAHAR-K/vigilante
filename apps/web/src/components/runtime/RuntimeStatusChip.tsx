@@ -19,7 +19,7 @@ export function RuntimeStatusChip({ onClick }: RuntimeStatusChipProps) {
   const isLoading = status === 'checking' || status === 'starting';
 
   const modelInfo = selection ? installedModels.find(m => m.id === selection.modelId) : null;
-  const displayName = modelInfo?.name || selection?.modelId || 'Set up AI';
+  const displayName = modelInfo?.name || selection?.modelId || 'Select Model';
 
   return (
     <button

@@ -182,16 +182,23 @@ export function listJobs(): PullJob[] {
  * Start a background pull job and return the initial PullJob immediately.
  * The caller can poll GET /api/models/pull/:jobId for progress.
  *
- * For llama.cpp, `modelId` should be the catalog entry's `downloadUrl`.
- * For ollama and mlx, `modelId` is the engine-native model identifier.
+ * @param engineId      - The engine that will handle the download.
+ * @param catalogModelId - The catalog entry's `id` — stored in the job for UI correlation.
+ * @param adapterModelId - The value passed to adapter.pull().  Defaults to catalogModelId.
+ *                         For llama.cpp, this must be the direct HTTPS download URL.
+ *                         For ollama/mlx, it is the same as catalogModelId.
  */
-export function startPull(engineId: EngineId, modelId: string): PullJob {
+export function startPull(
+  engineId:        EngineId,
+  catalogModelId:  string,
+  adapterModelId = catalogModelId,
+): PullJob {
   const id  = randomBytes(8).toString('hex')
   const job: PullJob = {
     id,
     engineId,
-    modelId,
-    status:          'queued',
+    modelId: catalogModelId,   // always the catalog-facing ID — never a raw download URL
+    status:  'queued',
     progressPercent: 0,
     downloadedBytes: null,
     totalBytes:      null,
@@ -214,7 +221,7 @@ export function startPull(engineId: EngineId, modelId: string): PullJob {
 
   // Run in background — the route returns the job snapshot immediately.
   adapter.pull(
-    modelId,
+    adapterModelId,
     (update: Partial<PullJob>) => { Object.assign(job, update) },
   ).then(() => {
     if (job.status !== 'complete') {

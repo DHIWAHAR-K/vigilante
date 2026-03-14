@@ -4,11 +4,11 @@ import {
   ensureRuntimeReady,
   probeRuntime,
   setSelection as apiSetSelection,
-  getSelection as apiGetSelection,
   getModelCatalog,
   startModelPull,
   getPullJob,
   getInstalledModels,
+  deleteModel as apiDeleteModel,
   EngineId,
   RuntimeEngine,
   InstalledModel,
@@ -61,6 +61,7 @@ interface RuntimeState {
   loadInstalled:     () => Promise<void>
   startPull:         (engineId: EngineId, modelId: string) => Promise<void>
   pollPullJob:       (jobId: string) => Promise<void>
+  deleteModel:       (engineId: EngineId, modelId: string) => Promise<void>
   setError:          (error: string | null) => void
 }
 
@@ -81,33 +82,47 @@ export const useRuntimeStore = create<RuntimeState>()(
         try {
           const result = await probeRuntime()
           const models = result.engines.flatMap(e => e.models).map(mapInstalledModel)
+
+          // If the backend has no persisted selection but models are available,
+          // auto-select the first one so the query bar has something to show.
+          let selection = result.selection
+          if (!selection && models.length > 0) {
+            const firstModel = models[0]
+            selection = { engineId: firstModel.engineId, modelId: firstModel.id }
+            try {
+              await apiSetSelection(selection)
+            } catch {
+              // Non-critical — selection lives in memory if persistence fails
+            }
+          }
+
           set({
             engines:         result.engines,
-            selection:       result.selection,
+            selection,
             installedModels: models,
-            status:          result.engines.some(e => e.models.length > 0 && e.status === 'running')
+            // 'ready'     — at least one engine is running and has models installed
+            // 'no_models' — probe succeeded but nothing can serve a query yet
+            //               (engines stopped, no models installed, or first launch)
+            status: result.engines.some(e => e.models.length > 0 && e.status === 'running')
               ? 'ready'
-              : result.engines.some(e => e.status === 'running')
-                ? 'no_models'
-                : 'checking',
+              : 'no_models',
           })
         } catch {
           set({ status: 'error', error: 'Failed to probe runtime' })
         }
       },
 
+      // ensureReady — explicitly start the selected engine.
+      // Called manually (e.g., a "Try Again" button), not on app mount.
+      // After the ensure completes, follows up with a full refreshStatus so
+      // all engines and their models are reflected in state.
       ensureReady: async () => {
         set({ status: 'starting', isChecking: true, error: null })
         try {
-          const result = await ensureRuntimeReady()
-          const models = result.engine.models.map(mapInstalledModel)
-          set({
-            status:          result.engine.models.length > 0 ? 'ready' : 'no_models',
-            engines:         [result.engine],
-            installedModels: models,
-            isChecking:      false,
-            error:           null,
-          })
+          await ensureRuntimeReady()
+          // Refresh all engines so state is complete (ensure only returns one engine).
+          await get().refreshStatus()
+          set({ isChecking: false })
         } catch (err) {
           set({
             status:     'error',
@@ -164,11 +179,23 @@ export const useRuntimeStore = create<RuntimeState>()(
           if (result.job.status === 'complete' || result.job.status === 'failed') {
             set({ isPulling: false })
             if (result.job.status === 'complete') {
-              await get().loadInstalled()
+              // Refresh installed models and re-probe engines so new model appears everywhere.
+              await get().refreshStatus()
             }
           }
         } catch (err) {
           set({ error: err instanceof Error ? err.message : 'Failed to poll job' })
+        }
+      },
+
+      deleteModel: async (engineId: EngineId, modelId: string) => {
+        try {
+          await apiDeleteModel(engineId, modelId)
+          // Backend clears selection if the deleted model was active.
+          // refreshStatus re-probes everything and auto-selects if models remain.
+          await get().refreshStatus()
+        } catch (err) {
+          set({ error: err instanceof Error ? err.message : 'Failed to delete model' })
         }
       },
 

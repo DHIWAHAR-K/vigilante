@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs'
 import { join, dirname } from 'path'
 import { homedir } from 'os'
 import type { IRuntimeAdapter } from './adapters/base'
@@ -76,6 +76,13 @@ export class RuntimeManager {
     saveSelection(sel)
   }
 
+  clearSelection(): void {
+    this.selection = null
+    try {
+      if (existsSync(SELECTION_PATH)) unlinkSync(SELECTION_PATH)
+    } catch { /* non-critical */ }
+  }
+
   // ── Probe ──────────────────────────────────────────────────────────────────
 
   /** Probe all engines concurrently and return their snapshots. */
@@ -95,7 +102,12 @@ export class RuntimeManager {
    *
    * Priority order:
    *   1. Use the explicitly selected engine if one is saved.
-   *   2. Fall back to Ollama for backward compatibility.
+   *   2. Fall back to Ollama when nothing is selected (backward compatibility).
+   *
+   * For engines that require a specific model at startup (llama.cpp, MLX),
+   * if a model is explicitly selected via Settings, that model is used.
+   * If only the engine is selected but no model, the adapter falls back to
+   * its default heuristic (first GGUF for llama.cpp; returns not_installed for MLX).
    *
    * Returns an EnsureResult regardless of whether start succeeded — the
    * route handler surfaces the outcome to the frontend.
@@ -111,12 +123,23 @@ export class RuntimeManager {
       return { engine, startAttempted: outcome !== 'already_running', outcome }
     }
 
-    // For MLX, if there's an explicit model selection, start with that model.
+    // For engines that need a model at server start time, use the selected model.
+    // Both llama.cpp and MLX require a model path/id at startup.
     if (targetEngineId === 'mlx' && this.selection?.modelId) {
       const mlx = adapter as MLXAdapter
       const initial = await mlx.probe()
       if (initial.status !== 'running') {
         const { outcome, engine } = await mlx.startWithModel(this.selection.modelId)
+        return { engine, startAttempted: true, outcome }
+      }
+      return { engine: initial, startAttempted: false, outcome: 'already_running' }
+    }
+
+    if (targetEngineId === 'llama.cpp' && this.selection?.modelId) {
+      const llamaCpp = adapter as LlamaCppAdapter
+      const initial = await llamaCpp.probe()
+      if (initial.status !== 'running') {
+        const { outcome, engine } = await llamaCpp.startWithModel(this.selection.modelId)
         return { engine, startAttempted: true, outcome }
       }
       return { engine: initial, startAttempted: false, outcome: 'already_running' }
@@ -130,11 +153,15 @@ export class RuntimeManager {
 
   /**
    * Return the IProvider for the currently selected engine.
-   * Returns null if no engine is configured (caller must handle 503).
+   * Returns null if no selection has been made — caller MUST return 503.
+   *
+   * There is NO implicit Ollama fallback here. If nothing is selected the query
+   * route must refuse to run and direct the user to Settings. This prevents
+   * confusing "Ollama isn't running" errors on systems that don't use Ollama.
    */
   getActiveProvider(): IProvider | null {
-    const engineId = this.selection?.engineId ?? 'ollama'
-    return this.adapters.get(engineId)?.getProvider() ?? null
+    if (!this.selection) return null
+    return this.adapters.get(this.selection.engineId)?.getProvider() ?? null
   }
 
   /**

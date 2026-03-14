@@ -48,8 +48,9 @@ modelRoutes.get('/models/installed', async (c) => {
 //
 //  Body: { engineId: string, modelId: string }
 //
-//  For llama.cpp, pass the catalog entry's `downloadUrl` as `modelId` — it is
-//  treated as a direct HTTPS URL to download the .gguf file.
+//  `modelId` is always the catalog entry's `id` field.
+//  For llama.cpp, the backend automatically resolves the catalog `downloadUrl`
+//  from the provided id — callers do NOT need to pass the raw URL.
 //  For ollama, `modelId` is the Ollama tag (e.g., "llama3.2:3b").
 //  For mlx, `modelId` is the HuggingFace repo ID.
 //
@@ -72,7 +73,24 @@ modelRoutes.post('/models/pull', async (c) => {
     return c.json({ error: `Unknown engine: ${engineId}` }, 400)
   }
 
-  const job = startPull(engineId as EngineId, modelId)
+  // For llama.cpp, the adapter's pull() expects a direct HTTPS download URL.
+  // Resolve it automatically from the catalog so callers can pass the catalog id.
+  let pullModelId = modelId
+  if (engineId === 'llama.cpp') {
+    const entry = MODEL_CATALOG.find(m => m.engineId === 'llama.cpp' && m.id === modelId)
+    if (entry?.downloadUrl) {
+      pullModelId = entry.downloadUrl
+    } else if (!modelId.startsWith('https://')) {
+      return c.json({
+        error: `llama.cpp model "${modelId}" not found in catalog and is not a direct HTTPS URL`,
+      }, 400)
+    }
+  }
+
+  // Pass the original catalog modelId (user-facing) and the resolved pull target separately.
+  // For llama.cpp, pullModelId is the download URL; modelId is the catalog entry id.
+  // For ollama/mlx they are the same value.
+  const job = startPull(engineId as EngineId, modelId, pullModelId)
   return c.json({ job }, 202)
 })
 
@@ -114,6 +132,12 @@ modelRoutes.delete('/models/:engineId/:modelId{.+}', async (c) => {
 
   try {
     await adapter.removeModel(modelId)
+    // If the deleted model was the active selection, clear it so the frontend
+    // gets a null selection on next probe rather than a ghost model reference.
+    const sel = runtimeManager.getSelection()
+    if (sel?.engineId === engineId && sel?.modelId === modelId) {
+      runtimeManager.clearSelection()
+    }
     return c.json({ deleted: { engineId, modelId } })
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 500)

@@ -374,7 +374,7 @@ export async function* streamQuery(request: QueryRequest): AsyncGenerator<SSEEve
     if (error instanceof Error && error.name === 'AbortError') return
     yield {
       event: 'error',
-      data:  { message: 'Failed to connect to AI service. Make sure Ollama is running.' },
+      data:  { message: 'Failed to connect to AI service. Open Settings to select a runtime and model.' },
     }
   } finally {
     abortController = null

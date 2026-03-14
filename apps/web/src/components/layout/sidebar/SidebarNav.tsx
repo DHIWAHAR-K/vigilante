@@ -1,6 +1,6 @@
 import React from 'react';
 import { Search, MessageSquarePlus } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/store/useUIStore';
 import { useConversationStore } from '@/store/useConversationStore';
@@ -12,22 +12,17 @@ interface SidebarNavProps {
 
 export function SidebarNav({ activeTab, setActiveTab }: SidebarNavProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { isSidebarCollapsed } = useUIStore();
-  const { createConversationFromDraft, openConversation, activeConversationId } = useConversationStore();
+  const { createConversationFromDraft, openConversation, activeConversationId, startDraftThread } = useConversationStore();
 
   const handleNewChat = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // Create a new conversation directly
-    const newConv = createConversationFromDraft('New Chat');
-    openConversation(newConv.id);
+    startDraftThread();
     setActiveTab('chat');
-    // Navigate to home
-    if (window.location.pathname === '/') {
-      // Already on home, just refresh
-      window.location.reload();
-    } else {
-      window.location.replace('/');
+    if (pathname !== '/') {
+      router.push('/');
     }
   };
 

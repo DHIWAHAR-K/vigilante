@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { ContextItem } from './types';
 import { ContextChip } from './ContextChip';
 import { MentionPicker } from './MentionPicker';
+import { ModelSelector } from './ModelSelector';
 import { useUIStore } from '@/store/useUIStore';
 import { useRuntimeStore } from '@/store/useRuntimeStore';
 import { breatheVariants, sendReadyVariants } from '@/lib/motion-config';
@@ -17,8 +18,8 @@ interface QueryInputProps {
 }
 
 export function QueryInput({ onSubmit, disabled = false }: QueryInputProps) {
-  const { isSidebarCollapsed, toggleSidebar, setRuntimeCenterOpen } = useUIStore();
-  const { selection, status, installedModels } = useRuntimeStore();
+  const { isSidebarCollapsed, toggleSidebar } = useUIStore();
+  const { selection, installedModels } = useRuntimeStore();
   
   const [query, setQuery] = useState('');
   const [lastQuery, setLastQuery] = useState('');
@@ -309,24 +310,7 @@ export function QueryInput({ onSubmit, disabled = false }: QueryInputProps) {
 
           {/* Right Actions */}
           <div className="flex items-center gap-2">
-            <button 
-              onClick={(e) => { e.stopPropagation(); setRuntimeCenterOpen(true); }}
-              className="flex items-center gap-2 px-2.5 h-6 rounded bg-bg-elevated hover:bg-border-subtle transition-colors relative"
-              title="Select Model (Cmd+Shift+S)"
-            >
-              <div className={cn(
-                "w-1.5 h-1.5 rounded-full",
-                status === 'ready'
-                  ? "bg-success shadow-[0_0_8px_rgba(52,211,153,0.4)]"
-                  : "bg-warning"
-              )} />
-              <span className="text-mono-xs text-accent">
-                {selection 
-                  ? installedModels.find(m => m.id === selection.modelId)?.name.split(':')[0] || selection.modelId.split(':')[0]
-                  : 'Select Model'}
-              </span>
-
-            </button>
+            <ModelSelector />
 
             <motion.button 
               variants={sendReadyVariants}

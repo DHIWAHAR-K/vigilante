@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Cpu, Download, CheckCircle2, AlertCircle, Loader2, X } from 'lucide-react';
+import { ArrowLeft, Cpu, Download, CheckCircle2, AlertCircle, Loader2, X, Trash2 } from 'lucide-react';
 import { ThemeSegmentedControl } from '@/components/theme/ThemeSegmentedControl';
 import { homeFadeIn } from '@/lib/motion-config';
 import { useRuntimeStore, ModelInfo } from '@/store/useRuntimeStore';
@@ -26,6 +26,7 @@ export default function SettingsPage() {
     loadCatalog,
     startPull,
     pollPullJob,
+    deleteModel,
   } = useRuntimeStore();
 
   const [activeTab, setActiveTab] = useState<'installed' | 'catalog'>('installed');
@@ -46,9 +47,7 @@ export default function SettingsPage() {
     }
     if (pullJob && (pullJob.status === 'complete' || pullJob.status === 'failed')) {
       setIsPulling(false);
-      if (pullJob.status === 'complete') {
-        refreshStatus();
-      }
+      // refreshStatus is handled by the store's pollPullJob on completion.
       if (pullJob.status === 'failed') {
         setPullError(pullJob.error || 'Pull failed');
       }
@@ -75,6 +74,24 @@ export default function SettingsPage() {
   const getEngineStatus = (engineId: EngineId): string => {
     const engine = engines.find(e => e.id === engineId);
     return engine?.status || 'unknown';
+  };
+
+  // Whether the Install button should be enabled for a catalog entry.
+  //
+  // Ollama delegates downloads to its own API — its server must be running.
+  // llama.cpp and MLX download directly to disk via the orchestrator — the
+  // engine binary just needs to be installed (stopped is fine, not_installed is not).
+  const canInstall = (engineId: EngineId): boolean => {
+    const s = getEngineStatus(engineId);
+    if (engineId === 'ollama') return s === 'running';
+    return s !== 'not_installed' && s !== 'unknown';
+  };
+
+  const unavailableReason = (engineId: EngineId): string => {
+    const s = getEngineStatus(engineId);
+    if (s === 'not_installed') return `${getEngineName(engineId)} not installed`;
+    if (engineId === 'ollama' && s !== 'running') return 'Ollama not running';
+    return `${getEngineName(engineId)} unavailable`;
   };
 
   return (
@@ -202,6 +219,8 @@ export default function SettingsPage() {
                             {model.name}
                           </p>
                           <div className="flex items-center gap-2 text-caption text-text-muted">
+                            <span className="uppercase">{model.format}</span>
+                            <span>•</span>
                             <span>{model.size}</span>
                             <span>•</span>
                             <span className="capitalize">{model.engineId}</span>
@@ -214,17 +233,26 @@ export default function SettingsPage() {
                           </div>
                         </div>
                       </div>
-                      {!isSelected && (
+                      <div className="flex items-center gap-2">
+                        {!isSelected && (
+                          <button
+                            onClick={() => handleSelectModel(model)}
+                            className="px-3 py-1.5 rounded-lg text-body-sm text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors"
+                          >
+                            Select
+                          </button>
+                        )}
+                        {isSelected && (
+                          <CheckCircle2 className="w-5 h-5 text-accent" />
+                        )}
                         <button
-                          onClick={() => handleSelectModel(model)}
-                          className="px-3 py-1.5 rounded-lg text-body-sm text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors"
+                          onClick={() => deleteModel(model.engineId, model.id)}
+                          title="Remove model"
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-error hover:bg-error/10 transition-colors"
                         >
-                          Select
+                          <Trash2 className="w-4 h-4" />
                         </button>
-                      )}
-                      {isSelected && (
-                        <CheckCircle2 className="w-5 h-5 text-accent" />
-                      )}
+                      </div>
                     </motion.div>
                   );
                 })}
@@ -267,10 +295,17 @@ export default function SettingsPage() {
 
             <div className="space-y-2">
               {catalogModels.map((model) => {
-                const isInstalled = installedModels.some(
-                  m => m.engineId === model.engineId && m.name === model.name
-                );
-                const isAvailable = getEngineStatus(model.engineId) === 'running';
+                const isInstalled = installedModels.some(m => {
+                  if (m.engineId !== model.engineId) return false;
+                  // llama.cpp: installed id is the absolute file path; catalog id ends with the .gguf filename
+                  if (m.engineId === 'llama.cpp') {
+                    const catalogFile = model.id.split('/').pop() ?? '';
+                    return catalogFile.length > 0 && m.id.endsWith(catalogFile);
+                  }
+                  // Ollama and MLX: installed id matches catalog id directly
+                  return m.id === model.id;
+                });
+                const available = canInstall(model.engineId);
                 
                 return (
                   <motion.div
@@ -291,6 +326,8 @@ export default function SettingsPage() {
                         </div>
                         <p className="text-caption text-text-muted mt-1">{model.description}</p>
                         <div className="flex items-center gap-3 mt-2 text-caption text-text-muted">
+                          <span className="uppercase">{model.format}</span>
+                          <span>•</span>
                           <span>{formatBytes(model.sizeBytes)}</span>
                           <span>•</span>
                           <span>{model.parameterSize}</span>
@@ -304,7 +341,7 @@ export default function SettingsPage() {
                             <CheckCircle2 className="w-4 h-4" />
                             Installed
                           </span>
-                        ) : isAvailable ? (
+                        ) : available ? (
                           <button
                             onClick={() => handlePullModel(model)}
                             disabled={isPulling}
@@ -325,7 +362,7 @@ export default function SettingsPage() {
                         ) : (
                           <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-body-sm text-text-muted bg-bg-elevated">
                             <AlertCircle className="w-4 h-4" />
-                            {getEngineName(model.engineId)} not running
+                            {unavailableReason(model.engineId)}
                           </span>
                         )}
                       </div>

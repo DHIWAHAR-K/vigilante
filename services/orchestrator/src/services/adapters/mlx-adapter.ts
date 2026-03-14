@@ -1,4 +1,5 @@
 import { execFileSync, spawn } from 'child_process'
+import { existsSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
 import { rm } from 'fs/promises'
@@ -17,6 +18,35 @@ const MLX_MODELS_DIR = process.env.MLX_MODELS_DIR
 function isMlxPlatform(): boolean {
   // MLX only runs on Apple Silicon macOS.
   return process.platform === 'darwin' && process.arch === 'arm64'
+}
+
+/**
+ * List MLX models that have been downloaded to the local cache directory.
+ * Each subdirectory is named as the HuggingFace repo ID with '/' → '--'.
+ * This lets probe() report installed models even when the server is stopped.
+ */
+function listLocalModels(): InstalledModel[] {
+  if (!existsSync(MLX_MODELS_DIR)) return []
+  try {
+    return readdirSync(MLX_MODELS_DIR, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => {
+        // Undo the pull() naming convention: 'mlx-community--Llama-3.2-3B-Instruct-4bit' → 'mlx-community/Llama-3.2-3B-Instruct-4bit'
+        const repoId = d.name.replaceAll('--', '/')
+        return {
+          id:            repoId,
+          name:          repoId,
+          engineId:      'mlx' as EngineId,
+          format:        'mlx' as const,
+          sizeBytes:     0,
+          parameterSize: null,
+          quantization:  null,
+          path:          join(MLX_MODELS_DIR, d.name),
+        }
+      })
+  } catch {
+    return []
+  }
 }
 
 function findMlxServer(): string | null {
@@ -102,11 +132,12 @@ export class MLXAdapter implements IRuntimeAdapter {
       }
     } catch { /* not running */ }
 
+    // Server not running — report cached local models so Settings can show them.
     return {
       id: 'mlx', name: 'MLX',
       status:    findMlxServer() ? 'stopped' : 'not_installed',
       version:   null,
-      models:    [],
+      models:    listLocalModels(),
       serverUrl: SERVER_URL,
       probedAt,
     }
