@@ -8,7 +8,7 @@
 
 1. [Vision](#1-vision)
 2. [Project Philosophy](#2-project-philosophy)
-3. [High-Level Architecture](#3-high-level-architecture)
+3. [High-Level Architecture](#3-high-level-architecture) 
 4. [Monorepo Structure](#4-monorepo-structure)
 5. [Core Pipeline: How an Answer is Produced](#5-core-pipeline-how-an-answer-is-produced)
 6. [Module Breakdown](#6-module-breakdown)
@@ -622,6 +622,18 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 2. Implement the `ISearchProvider` interface
 3. Register in `packages/search/src/index.ts`
 4. Follow the same test + docs + PR flow above
+
+---
+
+## Quick start (current state)
+
+From the repo root:
+
+```bash
+pnpm install && pnpm run dev
+```
+
+This starts the orchestrator and the Next.js web app. Ensure Ollama (or your configured provider) is running for query streaming. See `services/orchestrator/README.md` for orchestrator-specific options.
 
 ---
 
