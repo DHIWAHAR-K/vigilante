@@ -1,7 +1,10 @@
 pub mod activity;
+pub mod attachments;
 pub mod chat;
 pub mod drafts;
+pub mod mcp;
 pub mod messages;
+pub mod models;
 pub mod runtime;
 pub mod settings;
 pub mod storage;

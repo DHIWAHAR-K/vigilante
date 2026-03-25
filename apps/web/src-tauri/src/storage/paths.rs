@@ -78,7 +78,12 @@ impl StoragePaths {
             .join("metadata.json")
     }
 
-    pub fn attachment_original(&self, thread_id: &Uuid, attachment_id: &Uuid, ext: &str) -> PathBuf {
+    pub fn attachment_original(
+        &self,
+        thread_id: &Uuid,
+        attachment_id: &Uuid,
+        ext: &str,
+    ) -> PathBuf {
         self.attachment_dir(thread_id, attachment_id)
             .join(format!("original.{}", ext))
     }

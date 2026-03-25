@@ -1,8 +1,11 @@
 pub mod activity_service;
+pub mod attachment_service;
 pub mod chat_service;
 pub mod database_service;
 pub mod draft_service;
 pub mod export_service;
+pub mod mcp_service;
+pub mod model_service;
 pub mod runtime_service;
 pub mod scrapling_service;
 pub mod storage_service;

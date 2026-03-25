@@ -42,13 +42,8 @@ pub fn update_message_content_cmd(
     content: String,
     is_complete: bool,
 ) -> VResult<()> {
-    let entry = update_message_content(
-        &state.paths,
-        &thread_id,
-        &message_id,
-        content,
-        is_complete,
-    )?;
+    let entry =
+        update_message_content(&state.paths, &thread_id, &message_id, content, is_complete)?;
 
     if is_complete {
         let mut index = state.thread_index.write();

@@ -2,11 +2,12 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::error::{VError, VResult};
+use crate::models::attachment::ComposerAttachment;
 use crate::models::index::ThreadIndexEntry;
-use crate::models::message::{Message, QueryMode};
+use crate::models::message::Message;
 use crate::models::settings::ProviderConfig;
-use crate::models::thread::{DraftThread, PersistedThread};
-use crate::services::thread_service::{index_entry_from_thread, save_thread};
+use crate::models::thread::{DraftContextItem, DraftThread, PersistedThread};
+use crate::services::thread_service::save_thread;
 use crate::storage::json_store::{read_json, write_json_atomic};
 use crate::storage::paths::StoragePaths;
 
@@ -21,15 +22,32 @@ pub fn create_draft(paths: &StoragePaths, provider: ProviderConfig) -> VResult<D
     Ok(draft)
 }
 
-/// Update the composer input text for an existing draft (debounced from frontend).
-pub fn save_draft_input(
+pub fn get_draft(paths: &StoragePaths, id: &Uuid) -> VResult<DraftThread> {
+    read_json(&paths.draft_file(id)).map_err(|_| VError::DraftNotFound(id.to_string()))
+}
+
+/// Update the composer state for an existing draft (debounced from frontend).
+pub fn save_draft(
     paths: &StoragePaths,
     id: &Uuid,
     input_text: String,
+    context_items: Vec<DraftContextItem>,
 ) -> VResult<DraftThread> {
-    let mut draft: DraftThread = read_json(&paths.draft_file(id))
-        .map_err(|_| VError::DraftNotFound(id.to_string()))?;
+    let mut draft = get_draft(paths, id)?;
     draft.input_text = input_text;
+    draft.context_items = context_items;
+    draft.updated_at = Utc::now();
+    write_json_atomic(&paths.draft_file(id), &draft)?;
+    Ok(draft)
+}
+
+pub fn replace_draft_attachments(
+    paths: &StoragePaths,
+    id: &Uuid,
+    attachments: Vec<ComposerAttachment>,
+) -> VResult<DraftThread> {
+    let mut draft = get_draft(paths, id)?;
+    draft.attachments = attachments;
     draft.updated_at = Utc::now();
     write_json_atomic(&paths.draft_file(id), &draft)?;
     Ok(draft)

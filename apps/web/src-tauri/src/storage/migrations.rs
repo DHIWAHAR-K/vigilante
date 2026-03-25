@@ -57,6 +57,9 @@ pub fn run_migrations(paths: &StoragePaths) -> VResult<()> {
     };
     write_json_atomic(paths.schema_version().as_path(), &new_version)?;
 
-    tracing::info!(version = CURRENT_SCHEMA_VERSION, "Schema migration complete");
+    tracing::info!(
+        version = CURRENT_SCHEMA_VERSION,
+        "Schema migration complete"
+    );
     Ok(())
 }

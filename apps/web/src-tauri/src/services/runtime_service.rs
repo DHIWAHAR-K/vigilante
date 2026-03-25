@@ -60,9 +60,9 @@ pub fn find_ollama_binary() -> Option<PathBuf> {
 
     // Fallback: hard-coded macOS locations that may not be in the GUI app's $PATH.
     let fixed = [
-        "/usr/local/bin/ollama",       // Homebrew (Intel)
-        "/opt/homebrew/bin/ollama",    // Homebrew (Apple Silicon)
-        "/usr/bin/ollama",             // system-wide install
+        "/usr/local/bin/ollama",                              // Homebrew (Intel)
+        "/opt/homebrew/bin/ollama",                           // Homebrew (Apple Silicon)
+        "/usr/bin/ollama",                                    // system-wide install
         "/Applications/Ollama.app/Contents/Resources/ollama", // official .app bundle
     ];
 
@@ -100,10 +100,7 @@ pub async fn probe_ollama(
 
     let base = config.ollama_base_url.trim_end_matches('/');
 
-    let version_res = client
-        .get(format!("{}/api/version", base))
-        .send()
-        .await;
+    let version_res = client.get(format!("{}/api/version", base)).send().await;
 
     let (status, version, models) = match version_res {
         // Connection refused / timeout — determine installed vs missing.
@@ -285,9 +282,9 @@ pub async fn ensure_runtime_ready(
     let base = config.ollama_base_url.trim_end_matches('/');
     let healthy = wait_for_ollama_ready(
         base,
-        60,                             // max_attempts
-        Duration::from_millis(500),     // poll interval
-        Duration::from_millis(2_000),   // per-request connect timeout
+        60,                           // max_attempts
+        Duration::from_millis(500),   // poll interval
+        Duration::from_millis(2_000), // per-request connect timeout
     )
     .await;
 
@@ -300,10 +297,7 @@ pub async fn ensure_runtime_ready(
             base_url: config.ollama_base_url.clone(),
             probed_at: Utc::now(),
         };
-        let _ = write_json_atomic_compact(
-            paths.runtime_status_cache().as_path(),
-            &timeout_status,
-        );
+        let _ = write_json_atomic_compact(paths.runtime_status_cache().as_path(), &timeout_status);
         return Ok(EnsureReadyResult {
             runtime: timeout_status,
             start_attempted: true,
@@ -349,7 +343,10 @@ async fn list_models_from_client(client: &Client, base: &str) -> VResult<Vec<Mod
                 modified_at,
                 family: m.details.as_ref().and_then(|d| d.family.clone()),
                 parameter_size: m.details.as_ref().and_then(|d| d.parameter_size.clone()),
-                quantization: m.details.as_ref().and_then(|d| d.quantization_level.clone()),
+                quantization: m
+                    .details
+                    .as_ref()
+                    .and_then(|d| d.quantization_level.clone()),
             }
         })
         .collect();

@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// Cached result of an Ollama probe — written to `cache/runtime-status.json`.
 /// The frontend considers this stale after 30 seconds and re-requests via `probe_runtime`.
@@ -91,4 +92,57 @@ pub struct ModelInfo {
     pub family: Option<String>,
     pub parameter_size: Option<String>,
     pub quantization: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeSnapshot {
+    pub runtime: OllamaRuntimeStatus,
+    pub selected_model_id: Option<String>,
+    pub installed_models: Vec<ModelInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogModel {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub family: Option<String>,
+    pub size_bytes: u64,
+    pub parameter_size: String,
+    pub quantization: String,
+    pub context_window: u32,
+    pub tags: Vec<String>,
+    pub supports_cpu: bool,
+    pub supports_apple_silicon: bool,
+    pub supports_nvidia: bool,
+    pub min_memory_gb: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ModelInstallStatus {
+    Queued,
+    Downloading,
+    Verifying,
+    Complete,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelInstallJob {
+    pub id: Uuid,
+    pub model_id: String,
+    pub status: ModelInstallStatus,
+    pub progress_percent: u8,
+    pub downloaded_bytes: Option<u64>,
+    pub total_bytes: Option<u64>,
+    pub message: Option<String>,
+    pub error: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub completed_at: Option<DateTime<Utc>>,
 }

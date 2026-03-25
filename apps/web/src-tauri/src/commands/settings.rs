@@ -2,9 +2,9 @@ use chrono::Utc;
 use tauri::State;
 
 use crate::error::VResult;
+use crate::models::activity::ActivityEvent;
 use crate::models::settings::{AppSettings, RuntimeSettings};
 use crate::services::activity_service::log_event;
-use crate::models::activity::ActivityEvent;
 use crate::state::AppState;
 use crate::storage::json_store::{read_json_or_default, write_json_atomic};
 use uuid::Uuid;

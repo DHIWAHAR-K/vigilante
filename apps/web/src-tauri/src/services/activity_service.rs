@@ -121,7 +121,11 @@ pub fn log_message_sent(
     )
 }
 
-pub fn log_model_changed(paths: &StoragePaths, from_model: String, to_model: String) -> VResult<()> {
+pub fn log_model_changed(
+    paths: &StoragePaths,
+    from_model: String,
+    to_model: String,
+) -> VResult<()> {
     log_event(
         paths,
         ActivityEvent::ModelChanged {

@@ -5,11 +5,11 @@ pub mod services;
 pub mod state;
 pub mod storage;
 
-use tauri::Manager;
-use services::storage_service::init_storage;
 use services::database_service::AppDatabase;
+use services::storage_service::init_storage;
 use state::AppState;
 use storage::paths::StoragePaths;
+use tauri::Manager;
 
 /// Build and run the Tauri application.
 ///
@@ -46,8 +46,7 @@ pub fn run() {
             let paths = StoragePaths::new(base);
 
             // Run directory creation + schema migrations.
-            let thread_index = init_storage(&paths)
-                .expect("Failed to initialise local storage");
+            let thread_index = init_storage(&paths).expect("Failed to initialise local storage");
             let db = AppDatabase::open(paths.database().as_path())
                 .expect("Failed to initialise SQLite storage");
             db.import_legacy_json_threads(&paths)
@@ -77,6 +76,9 @@ pub fn run() {
             commands::workspaces::lookup_context_items_cmd,
             commands::workspaces::pick_workspace_directory_cmd,
             commands::workspaces::pick_attachment_files_cmd,
+            commands::attachments::import_attachments_cmd,
+            commands::attachments::list_attachments_cmd,
+            commands::attachments::remove_attachment_cmd,
             commands::chat::list_workspace_threads,
             commands::chat::open_workspace_thread,
             commands::chat::archive_workspace_thread,
@@ -84,11 +86,23 @@ pub fn run() {
             commands::chat::list_thread_sources,
             commands::chat::export_workspace_thread,
             commands::chat::submit_desktop_query,
+            // models + catalog
+            commands::models::get_runtime_snapshot,
+            commands::models::list_model_catalog,
+            commands::models::list_installed_models_cmd,
+            commands::models::get_selected_model_cmd,
+            commands::models::select_model_cmd,
+            commands::models::install_model_cmd,
+            commands::models::get_install_job_cmd,
+            commands::models::cancel_install_job_cmd,
+            commands::models::delete_model_cmd,
             // settings
             commands::settings::get_settings,
             commands::settings::update_settings,
             commands::settings::get_runtime_config,
             commands::settings::update_runtime_config,
+            // mcp
+            commands::mcp::probe_mcp_connector_cmd,
             // threads
             commands::threads::list_threads,
             commands::threads::list_archived_threads,
@@ -99,6 +113,7 @@ pub fn run() {
             commands::threads::delete_thread_cmd,
             // drafts
             commands::drafts::create_draft_cmd,
+            commands::drafts::get_draft_cmd,
             commands::drafts::save_draft_cmd,
             commands::drafts::discard_draft_cmd,
             commands::drafts::promote_draft_cmd,
@@ -106,11 +121,11 @@ pub fn run() {
             commands::messages::add_message_cmd,
             commands::messages::update_message_content_cmd,
             // runtime — see commands/runtime.rs for full tier documentation
-            commands::runtime::get_cached_runtime_status,  // tier 1: instant cache
-            commands::runtime::list_models,                 // tier 1: instant cache
-            commands::runtime::probe_runtime,               // tier 2: HTTP probe only
-            commands::runtime::ensure_runtime_ready,        // tier 3: launch + auto-start
-            commands::runtime::start_ollama_if_installed,   // supplemental: fire-and-forget
+            commands::runtime::get_cached_runtime_status, // tier 1: instant cache
+            commands::runtime::list_models,               // tier 1: instant cache
+            commands::runtime::probe_runtime,             // tier 2: HTTP probe only
+            commands::runtime::ensure_runtime_ready,      // tier 3: launch + auto-start
+            commands::runtime::start_ollama_if_installed, // supplemental: fire-and-forget
             // activity + export
             commands::activity::list_activity,
             commands::activity::export_thread_cmd,

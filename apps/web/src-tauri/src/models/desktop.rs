@@ -2,6 +2,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::models::attachment::{AttachmentSummary, ComposerAttachment};
+use crate::models::mcp::McpContextAction;
 use crate::models::message::{Citation, Message, QueryMode};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,6 +25,8 @@ pub struct ThreadSummary {
 pub struct ThreadDetail {
     pub thread: ThreadSummary,
     pub messages: Vec<Message>,
+    #[serde(default)]
+    pub attachments: Vec<AttachmentSummary>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,10 +34,13 @@ pub struct ThreadDetail {
 pub struct DesktopQueryRequest {
     pub workspace_id: Uuid,
     pub thread_id: Option<Uuid>,
+    pub draft_id: Option<Uuid>,
     pub query: String,
     pub mode: QueryMode,
     pub web_search: bool,
     pub context_items: Vec<DesktopContextItem>,
+    #[serde(default)]
+    pub attachments: Vec<ComposerAttachment>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,8 +49,14 @@ pub struct DesktopContextItem {
     pub id: String,
     pub kind: DesktopContextKind,
     pub title: String,
+    #[serde(default)]
     pub path: Option<String>,
+    #[serde(default)]
     pub value: Option<String>,
+    #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default)]
+    pub mcp_action: Option<McpContextAction>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
