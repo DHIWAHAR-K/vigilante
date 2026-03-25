@@ -4,6 +4,9 @@
 
 @layer base {
   :root, [data-theme="light"] {
+    --font-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    --font-mono: "SFMono-Regular", "IBM Plex Mono", "Fira Code", Consolas, monospace;
+
     /* ── LIGHT THEME (Warm, premium paper feel) ── */
     --bg-base:         #F6F3EC;
     --bg-surface:      #FFFFFF;
@@ -45,6 +48,9 @@
   }
 
   [data-theme="dark"] {
+    --font-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    --font-mono: "SFMono-Regular", "IBM Plex Mono", "Fira Code", Consolas, monospace;
+
     /* ── DARK THEME (Charcoal, grounded, intelligent) ── */
     --bg-base:         #0C0C0B;
     --bg-surface:      #161614;

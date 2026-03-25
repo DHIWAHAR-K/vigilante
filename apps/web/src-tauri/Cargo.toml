@@ -56,11 +56,17 @@ tempfile = "3"
 
 # Fast RwLock for in-memory thread index
 parking_lot = "0.12"
+rusqlite = { version = "0.32", features = ["bundled", "chrono", "uuid"] }
+regex = "1"
+url = "2"
+futures-util = "0.3"
+walkdir = "2"
 
 # HTTP client for Ollama health checks + model list
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "rustls-tls",
+  "stream",
 ] }
 
 # Logging

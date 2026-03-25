@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-use crate::error::{VError, VResult};
+use crate::error::VResult;
 
 /// Central registry of all filesystem paths used by the Vigilante data directory.
 ///
@@ -31,6 +31,10 @@ impl StoragePaths {
 
     pub fn schema_version(&self) -> PathBuf {
         self.base.join("schema-version.json")
+    }
+
+    pub fn database(&self) -> PathBuf {
+        self.base.join("vigilante.sqlite3")
     }
 
     pub fn thread_index(&self) -> PathBuf {
@@ -95,6 +99,18 @@ impl StoragePaths {
         self.base.join("cache")
     }
 
+    pub fn workers_dir(&self) -> PathBuf {
+        self.base.join("workers")
+    }
+
+    pub fn scrapling_worker(&self) -> PathBuf {
+        self.workers_dir().join("scrapling_worker.py")
+    }
+
+    pub fn web_cache_dir(&self) -> PathBuf {
+        self.cache_dir().join("web")
+    }
+
     pub fn runtime_status_cache(&self) -> PathBuf {
         self.cache_dir().join("runtime-status.json")
     }
@@ -118,14 +134,24 @@ impl StoragePaths {
     /// Ensure every expected top-level directory exists.
     /// Called once at startup by `storage_service::init_storage`.
     pub fn ensure_dirs(&self) -> VResult<()> {
+        let threads_dir = self.threads_dir();
+        let drafts_dir = self.drafts_dir();
+        let attachments_dir = self.attachments_dir();
+        let activity_dir = self.activity_dir();
+        let cache_dir = self.cache_dir();
+        let web_cache_dir = self.web_cache_dir();
+        let workers_dir = self.workers_dir();
+        let exports_dir = self.exports_dir();
         let dirs = [
             self.base.as_path(),
-            self.threads_dir().as_path(),
-            self.drafts_dir().as_path(),
-            self.attachments_dir().as_path(),
-            self.activity_dir().as_path(),
-            self.cache_dir().as_path(),
-            self.exports_dir().as_path(),
+            threads_dir.as_path(),
+            drafts_dir.as_path(),
+            attachments_dir.as_path(),
+            activity_dir.as_path(),
+            cache_dir.as_path(),
+            web_cache_dir.as_path(),
+            workers_dir.as_path(),
+            exports_dir.as_path(),
         ];
         for dir in dirs {
             std::fs::create_dir_all(dir)?;

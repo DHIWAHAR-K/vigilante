@@ -5,7 +5,9 @@ pub mod services;
 pub mod state;
 pub mod storage;
 
+use tauri::Manager;
 use services::storage_service::init_storage;
+use services::database_service::AppDatabase;
 use state::AppState;
 use storage::paths::StoragePaths;
 
@@ -46,6 +48,10 @@ pub fn run() {
             // Run directory creation + schema migrations.
             let thread_index = init_storage(&paths)
                 .expect("Failed to initialise local storage");
+            let db = AppDatabase::open(paths.database().as_path())
+                .expect("Failed to initialise SQLite storage");
+            db.import_legacy_json_threads(&paths)
+                .expect("Failed to import legacy thread data");
 
             // Log app start event (best-effort — don't block startup).
             let _ = services::activity_service::log_app_started(
@@ -54,7 +60,7 @@ pub fn run() {
             );
 
             // Register AppState as managed Tauri state.
-            app.manage(AppState::new(paths, thread_index));
+            app.manage(AppState::new(paths, thread_index, db));
 
             Ok(())
         })
@@ -63,6 +69,20 @@ pub fn run() {
             // storage
             commands::storage::get_storage_path,
             commands::storage::get_storage_info_cmd,
+            // desktop workspaces + chat
+            commands::workspaces::list_workspaces,
+            commands::workspaces::get_active_workspace,
+            commands::workspaces::create_workspace_cmd,
+            commands::workspaces::set_active_workspace_cmd,
+            commands::workspaces::lookup_context_items_cmd,
+            commands::workspaces::pick_workspace_directory_cmd,
+            commands::chat::list_workspace_threads,
+            commands::chat::open_workspace_thread,
+            commands::chat::archive_workspace_thread,
+            commands::chat::delete_workspace_thread,
+            commands::chat::list_thread_sources,
+            commands::chat::export_workspace_thread,
+            commands::chat::submit_desktop_query,
             // settings
             commands::settings::get_settings,
             commands::settings::update_settings,

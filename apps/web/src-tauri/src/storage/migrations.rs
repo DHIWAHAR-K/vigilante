@@ -1,6 +1,6 @@
 use chrono::Utc;
 
-use crate::error::{VError, VResult};
+use crate::error::VResult;
 use crate::models::settings::SchemaVersion;
 use crate::storage::json_store::{read_json_or_default, write_json_atomic};
 use crate::storage::paths::StoragePaths;

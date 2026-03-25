@@ -103,7 +103,7 @@ pub struct SearchSettings {
 impl Default for SearchSettings {
     fn default() -> Self {
         Self {
-            enabled_by_default: false,
+            enabled_by_default: true,
             provider: SearchProvider::Brave,
             brave_api_key: None,
             searxng_base_url: None,
@@ -142,7 +142,7 @@ impl Default for RuntimeSettings {
 }
 
 /// Schema version manifest — persisted at `schema-version.json`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SchemaVersion {
     pub version: u32,

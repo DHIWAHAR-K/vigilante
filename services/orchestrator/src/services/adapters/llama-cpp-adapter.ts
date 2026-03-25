@@ -276,7 +276,7 @@ export class LlamaCppAdapter implements IRuntimeAdapter {
           progressPercent: pct,
         })
       }
-      await new Promise<void>((res, rej) => writer.end(err => err ? rej(err) : res()))
+      await new Promise<void>((res, rej) => writer.end((err?: Error | null) => err ? rej(err) : res()))
       onProgress({ status: 'complete', progressPercent: 100, downloadedBytes: downloaded })
     } catch (err) {
       writer.destroy()

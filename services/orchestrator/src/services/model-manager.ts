@@ -67,7 +67,7 @@ export const MODEL_CATALOG: CatalogModel[] = [
   {
     id:            'gemma3:1b',
     name:          'Gemma 3 1B',
-    description:   'Google's smallest model — extremely fast on limited hardware.',
+    description:   "Google's smallest model — extremely fast on limited hardware.",
     engineId:      'ollama',
     format:        'ollama',
     sizeBytes:     815_000_000,

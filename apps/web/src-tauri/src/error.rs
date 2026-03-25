@@ -11,8 +11,14 @@ pub enum VError {
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 
+    #[error("Database error: {0}")]
+    Database(#[from] rusqlite::Error),
+
     #[error("Thread not found: {0}")]
     ThreadNotFound(String),
+
+    #[error("Workspace not found: {0}")]
+    WorkspaceNotFound(String),
 
     #[error("Draft not found: {0}")]
     DraftNotFound(String),
