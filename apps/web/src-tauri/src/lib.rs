@@ -76,6 +76,7 @@ pub fn run() {
             commands::workspaces::set_active_workspace_cmd,
             commands::workspaces::lookup_context_items_cmd,
             commands::workspaces::pick_workspace_directory_cmd,
+            commands::workspaces::pick_attachment_files_cmd,
             commands::chat::list_workspace_threads,
             commands::chat::open_workspace_thread,
             commands::chat::archive_workspace_thread,

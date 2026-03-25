@@ -139,6 +139,13 @@ export interface WebSource {
   contentText: string;
 }
 
+export interface StorageInfo {
+  basePath: string;
+  threadCount: number;
+  draftCount: number;
+  totalSizeBytes: number;
+}
+
 export interface AppearanceSettings {
   theme: Theme;
   sidebarCollapsed: boolean;
@@ -235,6 +242,10 @@ export function getActiveWorkspace(): Promise<Workspace> {
 
 export function pickWorkspaceDirectory(): Promise<string | null> {
   return invokeCommand('pick_workspace_directory_cmd');
+}
+
+export function pickAttachmentFiles(): Promise<string[]> {
+  return invokeCommand('pick_attachment_files_cmd');
 }
 
 export function createWorkspace(name: string, rootPath: string | null): Promise<Workspace> {
@@ -334,4 +345,8 @@ export function ensureRuntimeReady(): Promise<EnsureReadyResult> {
 
 export function listRuntimeModels(): Promise<ModelInfo[]> {
   return invokeCommand('list_models');
+}
+
+export function getStorageInfo(): Promise<StorageInfo> {
+  return invokeCommand('get_storage_info_cmd');
 }

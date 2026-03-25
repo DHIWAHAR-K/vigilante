@@ -51,3 +51,19 @@ pub async fn pick_workspace_directory_cmd(app: AppHandle) -> VResult<Option<Stri
 
     Ok(Some(path.display().to_string()))
 }
+
+#[tauri::command]
+pub async fn pick_attachment_files_cmd(app: AppHandle) -> VResult<Vec<String>> {
+    let Some(paths) = app.dialog().file().blocking_pick_files() else {
+        return Ok(Vec::new());
+    };
+
+    paths
+        .into_iter()
+        .map(|path| {
+            path.into_path()
+                .map(|resolved| resolved.display().to_string())
+                .map_err(|err| VError::Other(format!("Failed to resolve selected file: {err}")))
+        })
+        .collect()
+}
