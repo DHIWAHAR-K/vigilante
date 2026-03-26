@@ -20,7 +20,6 @@ import { cn } from '@/lib/utils';
 
 import { PendingAttachment } from './types';
 import { DesktopComposer } from './DesktopComposer';
-import { modeLabel, resolveGreeting } from './utils';
 
 interface DesktopWorkspaceProps {
   activeCitations: Citation[];
@@ -64,23 +63,18 @@ function renderMessage(message: Message) {
     <motion.article
       key={message.id}
       layout
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
-        'rounded-[28px] border px-5 py-4 shadow-[0_24px_48px_rgba(0,0,0,0.12)]',
+        'py-2',
         isAssistant
-          ? 'border-white/8 bg-white/[0.035]'
-          : 'border-accent/16 bg-accent/[0.07]',
+          ? 'px-0'
+          : 'ml-auto max-w-[85%] rounded-xl border border-border-subtle bg-bg-elevated px-4 py-3',
       )}
     >
-      <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-text-muted">
+      <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] text-text-muted">
         <span>{isAssistant ? 'Assistant' : 'You'}</span>
         {isAssistant && !message.isComplete && <span className="text-accent">Streaming</span>}
-        {message.modelUsed?.modelId && (
-          <span className="rounded-full border border-white/8 bg-white/4 px-2 py-1 tracking-normal normal-case">
-            {message.modelUsed.modelId}
-          </span>
-        )}
       </div>
 
       <div className="whitespace-pre-wrap text-[14px] leading-7 text-text-primary">
@@ -88,14 +82,14 @@ function renderMessage(message: Message) {
       </div>
 
       {message.citations.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           {message.citations.map((citation) => (
             <a
               key={citation.id}
               href={citation.url}
               target="_blank"
               rel="noreferrer"
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-text-secondary transition hover:text-text-primary"
+              className="rounded-md border border-border-subtle bg-bg-surface px-2.5 py-1 text-[11px] text-text-secondary transition hover:text-text-primary"
             >
               [{citation.index}] {citation.title}
             </a>
@@ -142,19 +136,14 @@ export function DesktopWorkspace({
 }: DesktopWorkspaceProps) {
   const hasMessages = (activeThread?.messages.length ?? 0) > 0;
   const inspectorAvailable =
-    Boolean(activeThread) || activeCitations.length > 0 || threadSources.length > 0 || Boolean(exportPath);
+    Boolean(activeThread) || activeCitations.length > 0 || threadSources.length > 0;
 
   return (
-    <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-[18%] top-[10%] h-64 w-64 rounded-full bg-accent/5 blur-[120px]" />
-        <div className="absolute bottom-[12%] right-[10%] h-72 w-72 rounded-full bg-white/[0.04] blur-[140px]" />
-      </div>
-
-      <div className="relative flex items-center justify-between px-6 py-5">
+    <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-bg-base">
+      <div className="relative flex items-center justify-between border-b border-border-subtle px-8 py-4">
         <div className="min-w-0">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-text-muted">Workspace</p>
-          <p className="mt-1 truncate text-[13px] text-text-secondary">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-text-muted">Workspace</p>
+          <p className="mt-1 truncate text-[13px] text-text-primary">
             {activeWorkspace?.name ?? 'Local workspace'}
           </p>
         </div>
@@ -163,22 +152,25 @@ export function DesktopWorkspace({
           <button
             onClick={onOpenInspector}
             disabled={!inspectorAvailable}
-            className="desktop-pill disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-subtle bg-bg-elevated text-text-secondary transition hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            title="Sources"
           >
             <PanelRightOpen className="h-3.5 w-3.5" />
-            Sources
+          </button>
+          <button
+            onClick={onOpenSettings}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-subtle bg-bg-elevated text-text-secondary transition hover:text-text-primary"
+            title="Settings"
+          >
+            <Settings2 className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => onExportThread('md')}
             disabled={!activeThread}
-            className="desktop-pill disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-subtle bg-bg-elevated text-text-secondary transition hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            title="Export"
           >
             <Download className="h-3.5 w-3.5" />
-            Export
-          </button>
-          <button onClick={onOpenSettings} className="desktop-pill">
-            <Settings2 className="h-3.5 w-3.5" />
-            Settings
           </button>
         </div>
       </div>
@@ -187,29 +179,18 @@ export function DesktopWorkspace({
         {!hasMessages ? (
           <motion.section
             key="desktop-home"
-            initial={{ opacity: 0, y: 24 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -18 }}
-            transition={{ duration: 0.28, ease: 'easeOut' }}
-            className="relative flex flex-1 items-center justify-center overflow-y-auto px-6 pb-24 pt-8"
+            exit={{ opacity: 0, y: -14 }}
+            transition={{ duration: 0.24, ease: 'easeOut' }}
+            className="relative flex flex-1 items-center justify-center overflow-y-auto px-6 pb-24 pt-10"
           >
-            <div className="w-full max-w-[760px]">
-              <div className="mb-5 flex justify-center">
-                <span className="rounded-full border border-white/10 bg-white/4 px-3 py-1 text-[11px] text-text-secondary shadow-[0_18px_40px_rgba(0,0,0,0.15)]">
-                  All chats and sources stay on this device
-                </span>
-              </div>
-
-              <div className="mb-7 flex items-center justify-center gap-3">
-                <span className="text-[28px] text-accent">✺</span>
-                <h1 className="font-serif text-[46px] font-medium tracking-[-0.03em] text-[#f1e8df] sm:text-[54px]">
-                  {resolveGreeting()}
-                </h1>
-              </div>
-
-              <p className="mx-auto mb-7 max-w-[540px] text-center text-[14px] text-text-secondary">
-                Research, retrieval, and local reasoning in one workspace. Upload files, reference your
-                project, and keep every thread on your machine.
+            <div className="w-full max-w-[860px]">
+              <h1 className="mb-2 text-center text-[28px] font-medium tracking-[-0.02em] text-text-primary">
+                Start a conversation
+              </h1>
+              <p className="mx-auto mb-7 max-w-[620px] text-center text-[14px] text-text-secondary">
+                Ask a question, attach files, or mention workspace context.
               </p>
 
               <DesktopComposer
@@ -241,7 +222,7 @@ export function DesktopWorkspace({
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 8 }}
-                    className="mx-auto mt-4 max-w-[620px] rounded-full border border-white/10 bg-white/4 px-4 py-2 text-center text-[12px] text-text-secondary"
+                    className="mx-auto mt-4 max-w-[720px] rounded-md border border-border-subtle bg-bg-elevated px-3 py-2 text-center text-[12px] text-text-secondary"
                   >
                     {streamError ?? settingsNotice}
                   </motion.div>
@@ -252,35 +233,19 @@ export function DesktopWorkspace({
         ) : (
           <motion.section
             key="desktop-thread"
-            initial={{ opacity: 0, y: 24 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -18 }}
-            transition={{ duration: 0.24, ease: 'easeOut' }}
+            exit={{ opacity: 0, y: -14 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
             className="relative flex min-h-0 flex-1 flex-col"
           >
-            <div className="desktop-scrollbar min-h-0 flex-1 overflow-y-auto px-6 pb-8 pt-2">
-              <div className="mx-auto w-full max-w-[840px]">
-                <div className="mb-6 flex flex-wrap items-center gap-3">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-text-muted">Conversation</p>
-                    <h1 className="mt-2 font-serif text-[32px] tracking-[-0.02em] text-[#f1e8df]">
-                      {activeThread?.thread.title ?? 'Untitled thread'}
-                    </h1>
-                  </div>
-
-                  <span className="rounded-full border border-white/10 bg-white/4 px-3 py-1 text-[11px] text-text-secondary">
-                    {modeLabel(mode)}
-                  </span>
-                  {activeCitations.length > 0 && (
-                    <span className="rounded-full border border-accent/20 bg-accent/10 px-3 py-1 text-[11px] text-accent">
-                      {activeCitations.length} citations
-                    </span>
-                  )}
-                  {threadSources.length > 0 && (
-                    <span className="rounded-full border border-white/10 bg-white/4 px-3 py-1 text-[11px] text-text-secondary">
-                      {threadSources.length} pages fetched
-                    </span>
-                  )}
+            <div className="desktop-scrollbar min-h-0 flex-1 overflow-y-auto px-6 pb-8 pt-6">
+              <div className="mx-auto w-full max-w-[860px]">
+                <div className="mb-5">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-text-muted">Thread</p>
+                  <h1 className="mt-2 text-[20px] font-medium tracking-[-0.02em] text-text-primary">
+                    {activeThread?.thread.title ?? 'Untitled thread'}
+                  </h1>
                 </div>
 
                 <AnimatePresence initial={false}>
@@ -289,9 +254,9 @@ export function DesktopWorkspace({
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -8 }}
-                      className="mb-5 rounded-[24px] border border-accent/20 bg-accent/8 px-4 py-3"
+                      className="mb-4 rounded-md border border-accent/20 bg-accent/10 px-3 py-2"
                     >
-                      <div className="mb-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-accent">
+                      <div className="mb-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-accent">
                         <Sparkles className="h-3.5 w-3.5" />
                         {researchProgress.phase.replaceAll('_', ' ')}
                       </div>
@@ -300,7 +265,7 @@ export function DesktopWorkspace({
                   )}
                 </AnimatePresence>
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {activeThread?.messages.map((message) => renderMessage(message))}
                 </div>
 
@@ -310,7 +275,7 @@ export function DesktopWorkspace({
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -8 }}
-                      className="mt-5 rounded-[24px] border border-white/8 bg-white/[0.03] px-4 py-3 text-[12px] text-text-secondary"
+                      className="mt-5 rounded-md border border-border-subtle bg-bg-elevated px-3 py-2 text-[12px] text-text-secondary"
                     >
                       {streamError ?? settingsNotice ?? exportPath}
                     </motion.div>
@@ -319,7 +284,7 @@ export function DesktopWorkspace({
               </div>
             </div>
 
-            <div className="border-t border-white/8 px-0 py-5 backdrop-blur-xl">
+            <div className="border-t border-border-subtle px-0 py-5">
               <DesktopComposer
                 attachments={attachments}
                 compact

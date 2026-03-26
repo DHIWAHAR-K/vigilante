@@ -5,31 +5,31 @@
 @layer base {
   :root,
   [data-theme='light'] {
-    --font-sans: 'SF Pro Text', 'IBM Plex Sans', 'Inter', 'Segoe UI', sans-serif;
+    --font-sans: 'SF Pro Display', 'SF Pro Text', 'IBM Plex Sans', 'Inter', 'Segoe UI', sans-serif;
     --font-serif: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
     --font-mono: 'SFMono-Regular', 'IBM Plex Mono', 'Fira Code', Consolas, monospace;
 
-    --bg-base: #f5f1ea;
+    --bg-base: #f4f7fb;
     --bg-surface: #ffffff;
-    --bg-elevated: #f3ede4;
-    --bg-overlay: rgba(255, 255, 255, 0.82);
-    --bg-input: rgba(255, 255, 255, 0.84);
+    --bg-elevated: #eef3f9;
+    --bg-overlay: rgba(255, 255, 255, 0.92);
+    --bg-input: rgba(255, 255, 255, 0.95);
 
-    --border-subtle: rgba(25, 21, 16, 0.08);
-    --border-medium: rgba(25, 21, 16, 0.12);
-    --border-strong: rgba(25, 21, 16, 0.18);
+    --border-subtle: rgba(12, 26, 48, 0.1);
+    --border-medium: rgba(12, 26, 48, 0.16);
+    --border-strong: rgba(12, 26, 48, 0.22);
 
-    --text-primary: #191510;
-    --text-secondary: #625b53;
-    --text-muted: #8b8278;
-    --text-ghost: #bbb4ac;
+    --text-primary: #101828;
+    --text-secondary: #3a4b63;
+    --text-muted: #617089;
+    --text-ghost: #90a0b8;
 
-    --accent: #f69c4b;
-    --accent-bright: #ffb66c;
-    --accent-dim: #d77b27;
-    --accent-hover: #ffb66c;
-    --accent-subtle: rgba(246, 156, 75, 0.12);
-    --accent-glow: rgba(246, 156, 75, 0.2);
+    --accent: #2f6bdb;
+    --accent-bright: #4f85eb;
+    --accent-dim: #2558b7;
+    --accent-hover: #4f85eb;
+    --accent-subtle: rgba(47, 107, 219, 0.14);
+    --accent-glow: rgba(47, 107, 219, 0.2);
 
     --success: #059669;
     --warning: #d97706;
@@ -38,31 +38,31 @@
   }
 
   [data-theme='dark'] {
-    --font-sans: 'SF Pro Text', 'IBM Plex Sans', 'Inter', 'Segoe UI', sans-serif;
+    --font-sans: 'SF Pro Display', 'SF Pro Text', 'IBM Plex Sans', 'Inter', 'Segoe UI', sans-serif;
     --font-serif: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
     --font-mono: 'SFMono-Regular', 'IBM Plex Mono', 'Fira Code', Consolas, monospace;
 
-    --bg-base: #11100f;
-    --bg-surface: #171513;
-    --bg-elevated: #1c1917;
-    --bg-overlay: rgba(24, 22, 20, 0.78);
-    --bg-input: rgba(26, 23, 21, 0.88);
+    --bg-base: #0a0f18;
+    --bg-surface: #111826;
+    --bg-elevated: #151f30;
+    --bg-overlay: rgba(11, 16, 24, 0.84);
+    --bg-input: rgba(18, 26, 40, 0.88);
 
-    --border-subtle: rgba(255, 255, 255, 0.06);
-    --border-medium: rgba(255, 255, 255, 0.1);
-    --border-strong: rgba(255, 255, 255, 0.14);
+    --border-subtle: rgba(161, 184, 217, 0.14);
+    --border-medium: rgba(161, 184, 217, 0.2);
+    --border-strong: rgba(161, 184, 217, 0.26);
 
-    --text-primary: #f3ede6;
-    --text-secondary: #b5ada3;
-    --text-muted: #746c63;
-    --text-ghost: #4d4943;
+    --text-primary: #e5ecf7;
+    --text-secondary: #b5c1d5;
+    --text-muted: #8797b0;
+    --text-ghost: #59687f;
 
-    --accent: #f69c4b;
-    --accent-bright: #ffb66c;
-    --accent-dim: #d77b27;
-    --accent-hover: #ffb66c;
-    --accent-subtle: rgba(246, 156, 75, 0.11);
-    --accent-glow: rgba(246, 156, 75, 0.18);
+    --accent: #76a8ff;
+    --accent-bright: #98beff;
+    --accent-dim: #4e89f0;
+    --accent-hover: #98beff;
+    --accent-subtle: rgba(118, 168, 255, 0.17);
+    --accent-glow: rgba(118, 168, 255, 0.24);
 
     --success: #34d399;
     --warning: #fbbf24;
@@ -90,8 +90,8 @@
   body {
     @apply bg-bg-base font-sans text-text-primary antialiased;
     font-size: 15px;
-    line-height: 1.55;
-    letter-spacing: -0.01em;
+    line-height: 1.6;
+    letter-spacing: -0.005em;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     -webkit-app-region: no-drag;
@@ -104,9 +104,9 @@
     inset: 0;
     pointer-events: none;
     background:
-      radial-gradient(circle at 18% 22%, rgba(246, 156, 75, 0.07), transparent 28%),
-      radial-gradient(circle at 82% 18%, rgba(255, 255, 255, 0.035), transparent 24%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.012), transparent 35%);
+      radial-gradient(circle at 8% 8%, rgba(118, 168, 255, 0.16), transparent 32%),
+      radial-gradient(circle at 92% 14%, rgba(86, 126, 196, 0.14), transparent 30%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.01), transparent 45%);
     z-index: 0;
   }
 
@@ -126,7 +126,7 @@
   }
 
   ::selection {
-    background: rgba(246, 156, 75, 0.24);
+    background: rgba(118, 168, 255, 0.28);
     color: var(--text-primary);
   }
 }
@@ -202,25 +202,25 @@
   }
 
   .desktop-panel {
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.018)),
-      rgba(20, 18, 17, 0.84);
+      linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
+      var(--bg-overlay);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.03),
-      0 28px 60px rgba(0, 0, 0, 0.22);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
+      inset 0 1px 0 rgba(255, 255, 255, 0.02),
+      0 24px 54px rgba(4, 8, 15, 0.36);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
   }
 
   .desktop-panel-strong {
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--border-medium);
+    background: var(--bg-input);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.02),
-      0 20px 44px rgba(0, 0, 0, 0.18);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
+      inset 0 1px 0 rgba(255, 255, 255, 0.015),
+      0 14px 34px rgba(4, 8, 15, 0.22);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
   }
 
   .desktop-pill {
@@ -228,8 +228,8 @@
     align-items: center;
     gap: 0.45rem;
     border-radius: 9999px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-subtle);
+    background: rgba(255, 255, 255, 0.03);
     padding: 0.5rem 0.85rem;
     font-size: 0.75rem;
     color: var(--text-secondary);
@@ -237,6 +237,7 @@
   }
 
   .desktop-pill:hover {
+    border-color: var(--border-medium);
     background: rgba(255, 255, 255, 0.06);
     color: var(--text-primary);
   }
@@ -244,8 +245,8 @@
   .desktop-field {
     width: 100%;
     border-radius: 1rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-subtle);
+    background: rgba(255, 255, 255, 0.03);
     padding: 0.85rem 0.95rem;
     color: var(--text-primary);
     outline: none;
@@ -253,13 +254,13 @@
   }
 
   .desktop-field:focus {
-    border-color: rgba(246, 156, 75, 0.34);
-    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--accent-dim);
+    background: rgba(255, 255, 255, 0.05);
   }
 
   .desktop-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
   }
 
   .desktop-scrollbar::-webkit-scrollbar {
@@ -274,7 +275,7 @@
   .desktop-scrollbar::-webkit-scrollbar-thumb {
     border: 3px solid transparent;
     border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.18);
     background-clip: padding-box;
   }
 
@@ -292,7 +293,7 @@
 
   .interactive-card:hover {
     transform: translateY(-1px);
-    border-color: rgba(255, 255, 255, 0.12);
+    border-color: var(--border-medium);
     background: rgba(255, 255, 255, 0.05);
   }
 
