@@ -1,12 +1,21 @@
-import type {
-  AttachmentKind,
-  AttachmentSummary,
+import {
+  DesktopContextItem,
   OllamaRuntimeStatusInfo,
   QueryMode,
+  WorkspaceContextItem,
 } from '@/lib/desktop/client';
 
-export function formatPreviewDate(value?: string | null) {
-  if (!value) return '';
+import { ModePreset, PendingAttachment } from './types';
+
+const imagePattern = /\.(avif|bmp|gif|heic|jpeg|jpg|png|svg|webp)$/i;
+
+export const MODE_PRESETS: ModePreset[] = [
+  { mode: 'ask', label: 'Write', subtitle: 'Draft and answer' },
+  { mode: 'research', label: 'Learn', subtitle: 'Search and synthesize' },
+  { mode: 'deep_research', label: 'Code', subtitle: 'Investigate deeply' },
+];
+
+export function formatPreviewDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleDateString(undefined, {
@@ -15,41 +24,37 @@ export function formatPreviewDate(value?: string | null) {
   });
 }
 
-export function formatRelativeTime(value?: string | null) {
-  if (!value) return 'Just now';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Just now';
-
-  const diff = Date.now() - date.getTime();
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return formatPreviewDate(value);
+export function deriveTitle(query: string) {
+  const first = query.trim().split(/[.!?\n]/)[0] ?? query.trim();
+  return first.length <= 54 ? first : `${first.slice(0, 53)}…`;
 }
 
-export function formatModeLabel(mode: QueryMode) {
-  switch (mode) {
-    case 'ask':
-      return 'Ask';
-    case 'research':
-      return 'Research';
-    case 'deep_research':
-      return 'Deep Research';
-    case 'rag':
-      return 'RAG';
-    default:
-      return mode;
-  }
+export function buildContextItem(item: WorkspaceContextItem): DesktopContextItem {
+  return {
+    id: item.id,
+    kind:
+      item.kind === 'directory'
+        ? 'directory'
+        : item.kind === 'thread'
+          ? 'thread'
+          : item.kind === 'url'
+            ? 'url'
+            : 'file',
+    title: item.title,
+    path: item.path,
+    value: item.path ?? item.title,
+  };
+}
+
+export function inferWorkspaceName(path: string) {
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  return parts[parts.length - 1] ?? 'Workspace';
 }
 
 export function runtimeLabel(status: OllamaRuntimeStatusInfo | null) {
   switch (status?.status) {
     case 'running':
-      return 'Running';
+      return 'Ready';
     case 'available':
       return 'No models';
     case 'stopped':
@@ -57,25 +62,35 @@ export function runtimeLabel(status: OllamaRuntimeStatusInfo | null) {
     case 'not_installed':
       return 'Not installed';
     case 'error':
-      return 'Error';
+      return 'Unavailable';
     default:
-      return 'Unknown';
+      return 'Checking';
   }
 }
 
 export function runtimeTone(status: OllamaRuntimeStatusInfo | null) {
   switch (status?.status) {
     case 'running':
-      return 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200';
+      return 'text-emerald-300 border-emerald-500/20 bg-emerald-500/10';
     case 'available':
-      return 'border-amber-300/25 bg-amber-300/10 text-amber-100';
+      return 'text-amber-200 border-amber-500/20 bg-amber-500/10';
     case 'stopped':
     case 'not_installed':
     case 'error':
-      return 'border-rose-300/25 bg-rose-300/10 text-rose-200';
+      return 'text-rose-300 border-rose-500/20 bg-rose-500/10';
     default:
-      return 'border-border-subtle bg-bg-surface text-text-muted';
+      return 'text-text-secondary border-border-subtle bg-bg-surface/70';
   }
+}
+
+export function formatModelSize(sizeBytes: number) {
+  if (sizeBytes >= 1024 ** 3) {
+    return `${(sizeBytes / 1024 ** 3).toFixed(1)} GB`;
+  }
+  if (sizeBytes >= 1024 ** 2) {
+    return `${(sizeBytes / 1024 ** 2).toFixed(1)} MB`;
+  }
+  return `${sizeBytes} B`;
 }
 
 export function formatBytes(sizeBytes: number) {
@@ -86,36 +101,63 @@ export function formatBytes(sizeBytes: number) {
     return `${(sizeBytes / 1024 ** 2).toFixed(1)} MB`;
   }
   if (sizeBytes >= 1024) {
-    return `${Math.round(sizeBytes / 1024)} KB`;
+    return `${(sizeBytes / 1024).toFixed(1)} KB`;
   }
   return `${sizeBytes} B`;
 }
 
-export function deriveTitle(query: string) {
-  const first = query.trim().split(/[.!?\n]/)[0] ?? query.trim();
-  return first.length <= 58 ? first : `${first.slice(0, 57)}…`;
-}
+export function resolveGreeting(date = new Date()) {
+  const hour = date.getHours();
 
-export function inferWorkspaceName(path: string) {
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  return parts[parts.length - 1] ?? 'Workspace';
-}
-
-export function attachmentKindLabel(kind: AttachmentKind) {
-  switch (kind) {
-    case 'image':
-      return 'Image';
-    case 'document':
-      return 'Document';
-    case 'code':
-      return 'Code';
-    case 'data':
-      return 'Data';
-    default:
-      return 'File';
+  if (hour < 5) {
+    return 'Hello, night owl';
   }
+  if (hour < 12) {
+    return 'Hello, early bird';
+  }
+  if (hour < 18) {
+    return 'Hello, daylight thinker';
+  }
+  if (hour < 22) {
+    return 'Hello, evening researcher';
+  }
+  return 'Hello, night owl';
 }
 
-export function isImageAttachment(attachment: Pick<AttachmentSummary, 'kind' | 'mimeType'>) {
-  return attachment.kind === 'image' || attachment.mimeType.startsWith('image/');
+export function createAttachment(path: string): PendingAttachment {
+  const cleanPath = path.trim();
+  const name = cleanPath.split(/[\\/]/).filter(Boolean).at(-1) ?? cleanPath;
+  const kind = imagePattern.test(name) ? 'image' : 'file';
+  const id = `attachment:${cleanPath}`;
+
+  return {
+    id,
+    name,
+    path: cleanPath,
+    kind,
+    contextItem: {
+      id,
+      kind: 'file',
+      title: name,
+      path: cleanPath,
+      value: cleanPath,
+    },
+  };
+}
+
+export function extractDroppedPaths(files: FileList) {
+  const paths: string[] = [];
+
+  Array.from(files).forEach((file) => {
+    const candidate = (file as File & { path?: string }).path;
+    if (candidate) {
+      paths.push(candidate);
+    }
+  });
+
+  return paths;
+}
+
+export function modeLabel(mode: QueryMode) {
+  return mode.replaceAll('_', ' ');
 }

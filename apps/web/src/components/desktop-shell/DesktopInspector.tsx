@@ -1,236 +1,186 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { Download, ExternalLink, Globe, Link2, Radar, Settings2 } from 'lucide-react';
+import React from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ExternalLink, Loader2, PanelRightClose, Sparkles } from 'lucide-react';
 
-import type {
-  AttachmentSummary,
+import {
   Citation,
   OllamaRuntimeStatusInfo,
   ResearchProgressEvent,
-  ThreadDetail,
   WebSource,
 } from '@/lib/desktop/client';
 import { cn } from '@/lib/utils';
-import { attachmentKindLabel, formatBytes, runtimeLabel, runtimeTone } from './utils';
+
+import { runtimeLabel, runtimeTone } from './utils';
 
 interface DesktopInspectorProps {
-  activeThread: ThreadDetail | null;
   citations: Citation[];
-  attachments: AttachmentSummary[];
-  threadSources: WebSource[];
-  runtimeStatus: OllamaRuntimeStatusInfo | null;
-  researchProgress: ResearchProgressEvent | null;
   exportPath: string | null;
-  onExportMarkdown: () => void;
-  onExportJson: () => void;
-  onOpenSettings: () => void;
+  onClose: () => void;
+  onEnsureRuntime: () => void;
+  open: boolean;
+  researchProgress: ResearchProgressEvent | null;
+  runtimeBusy: boolean;
+  runtimeStatus: OllamaRuntimeStatusInfo | null;
+  sources: WebSource[];
 }
 
 export function DesktopInspector({
-  activeThread,
   citations,
-  attachments,
-  threadSources,
-  runtimeStatus,
-  researchProgress,
   exportPath,
-  onExportMarkdown,
-  onExportJson,
-  onOpenSettings,
+  onClose,
+  onEnsureRuntime,
+  open,
+  researchProgress,
+  runtimeBusy,
+  runtimeStatus,
+  sources,
 }: DesktopInspectorProps) {
   return (
-    <motion.aside
-      initial={{ opacity: 0, x: 18 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 18 }}
-      className="desktop-inspector w-[360px] shrink-0 border-l border-border-subtle"
-    >
-      <div className="flex h-full flex-col">
-        <div className="border-b border-border-subtle px-5 py-5">
-          <p className="text-[10px] uppercase tracking-[0.26em] text-text-muted">Inspector</p>
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-semibold tracking-[-0.02em] text-text-primary">Research state</h3>
-              <p className="mt-1 text-xs text-text-muted">
-                Citations, attachments, exports, and runtime context.
-              </p>
-            </div>
-            <button onClick={onOpenSettings} className="desktop-icon-button" title="Open settings">
-              <Settings2 className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.button
+            type="button"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 z-30 bg-black/35 backdrop-blur-[2px]"
+          />
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-          <section className="desktop-card gap-4">
-            <div className="flex items-start justify-between gap-3">
+          <motion.aside
+            initial={{ opacity: 0, x: 32 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 32 }}
+            transition={{ duration: 0.24, ease: 'easeOut' }}
+            className="fixed inset-y-4 right-4 z-40 hidden w-[360px] overflow-hidden rounded-[30px] border border-white/10 bg-[#151412]/96 shadow-[0_36px_80px_rgba(0,0,0,0.45)] backdrop-blur-2xl xl:flex xl:flex-col"
+          >
+            <div className="flex items-center justify-between border-b border-white/8 px-5 py-4">
               <div>
-                <p className="text-sm font-medium text-text-primary">Runtime</p>
-                <p className="mt-1 text-xs text-text-muted">
-                  {runtimeStatus?.baseUrl ?? 'http://127.0.0.1:11434'}
-                </p>
+                <p className="text-[10px] uppercase tracking-[0.2em] text-text-muted">Inspector</p>
+                <h2 className="mt-1 text-[18px] text-text-primary">Research details</h2>
               </div>
-              <span className={cn('desktop-pill', runtimeTone(runtimeStatus))}>
-                {runtimeLabel(runtimeStatus)}
-              </span>
-            </div>
-            {researchProgress && (
-              <div className="rounded-2xl border border-accent/20 bg-accent/8 px-3 py-3">
-                <p className="text-[10px] uppercase tracking-[0.22em] text-accent">
-                  {researchProgress.phase.replaceAll('_', ' ')}
-                </p>
-                <p className="mt-2 text-sm text-text-primary">{researchProgress.message}</p>
-              </div>
-            )}
-          </section>
-
-          <section className="desktop-card gap-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-text-primary">Thread exports</p>
-                <p className="mt-1 text-xs text-text-muted">
-                  Save the current conversation as Markdown or JSON.
-                </p>
-              </div>
-              <Download className="h-4 w-4 text-text-muted" />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={onExportMarkdown} disabled={!activeThread} className="desktop-secondary-button justify-center px-3 py-2.5 disabled:opacity-50">
-                Markdown
-              </button>
-              <button onClick={onExportJson} disabled={!activeThread} className="desktop-secondary-button justify-center px-3 py-2.5 disabled:opacity-50">
-                JSON
+              <button onClick={onClose} className="desktop-pill">
+                <PanelRightClose className="h-3.5 w-3.5" />
+                Close
               </button>
             </div>
-            {exportPath && <p className="break-all text-xs text-text-muted">{exportPath}</p>}
-          </section>
 
-          <section className="desktop-card gap-3">
-            <div className="flex items-center gap-2">
-              <Link2 className="h-4 w-4 text-text-muted" />
-              <div>
-                <p className="text-sm font-medium text-text-primary">Citations</p>
-                <p className="text-xs text-text-muted">{citations.length} source references</p>
-              </div>
-            </div>
-            {citations.length > 0 ? (
-              <div className="space-y-2">
-                {citations.map((citation) => (
-                  <a
-                    key={citation.id}
-                    href={citation.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block rounded-2xl border border-border-subtle bg-bg-base/80 px-3 py-3 transition-colors hover:border-accent/25"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="line-clamp-2 text-sm font-medium text-text-primary">
-                          [{citation.index}] {citation.title}
-                        </p>
-                        {citation.domain && <p className="mt-1 text-xs text-text-muted">{citation.domain}</p>}
-                      </div>
-                      <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-text-muted" />
-                    </div>
-                    {citation.excerpt && (
-                      <p className="mt-2 line-clamp-3 text-xs leading-5 text-text-secondary">
-                        {citation.excerpt}
-                      </p>
-                    )}
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <EmptyCard icon={Link2} text="Citations from web retrieval appear here when a research-enabled answer finishes." />
-            )}
-          </section>
-
-          <section className="desktop-card gap-3">
-            <div className="flex items-center gap-2">
-              <Radar className="h-4 w-4 text-text-muted" />
-              <div>
-                <p className="text-sm font-medium text-text-primary">Attachments</p>
-                <p className="text-xs text-text-muted">{attachments.length} local files linked to this chat</p>
-              </div>
-            </div>
-            {attachments.length > 0 ? (
-              <div className="space-y-2">
-                {attachments.map((attachment) => (
-                  <div
-                    key={attachment.id}
-                    className="rounded-2xl border border-border-subtle bg-bg-base/80 px-3 py-3"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="line-clamp-1 text-sm font-medium text-text-primary">
-                          {attachment.displayName}
-                        </p>
-                        <p className="mt-1 text-xs text-text-muted">
-                          {attachmentKindLabel(attachment.kind)} · {formatBytes(attachment.sizeBytes)}
-                        </p>
-                      </div>
-                    </div>
+            <div className="desktop-scrollbar flex-1 space-y-4 overflow-y-auto px-5 py-5">
+              <section className="desktop-panel-strong rounded-[24px] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] text-text-primary">Runtime</p>
+                    <p className="mt-1 text-[11px] text-text-muted">{runtimeStatus?.baseUrl ?? 'Local runtime'}</p>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <EmptyCard icon={Radar} text="Uploaded files and images remain local and show up here after they are attached to the conversation." />
-            )}
-          </section>
+                  <span className={cn('rounded-full border px-3 py-1 text-[11px]', runtimeTone(runtimeStatus))}>
+                    {runtimeLabel(runtimeStatus)}
+                  </span>
+                </div>
 
-          <section className="desktop-card gap-3">
-            <div className="flex items-center gap-2">
-              <Globe className="h-4 w-4 text-text-muted" />
-              <div>
-                <p className="text-sm font-medium text-text-primary">Fetched pages</p>
-                <p className="text-xs text-text-muted">{threadSources.length} cached web sources</p>
-              </div>
-            </div>
-            {threadSources.length > 0 ? (
-              <div className="space-y-2">
-                {threadSources.map((source) => (
-                  <a
-                    key={source.id}
-                    href={source.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block rounded-2xl border border-border-subtle bg-bg-base/80 px-3 py-3 transition-colors hover:border-accent/25"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="line-clamp-2 text-sm font-medium text-text-primary">{source.title}</p>
-                        {source.domain && <p className="mt-1 text-xs text-text-muted">{source.domain}</p>}
+                <button
+                  onClick={onEnsureRuntime}
+                  disabled={runtimeBusy}
+                  className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/4 px-3 py-1.5 text-[11px] text-text-secondary transition hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {runtimeBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {runtimeBusy ? 'Checking runtime' : 'Check runtime'}
+                </button>
+              </section>
+
+              {researchProgress && (
+                <section className="rounded-[24px] border border-accent/20 bg-accent/8 p-4">
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-accent">
+                    {researchProgress.phase.replaceAll('_', ' ')}
+                  </p>
+                  <p className="mt-2 text-[13px] text-text-primary">{researchProgress.message}</p>
+                </section>
+              )}
+
+              {exportPath && (
+                <section className="desktop-panel-strong rounded-[24px] p-4">
+                  <p className="text-[11px] text-text-primary">Latest export</p>
+                  <p className="mt-2 break-all text-[11px] text-text-muted">{exportPath}</p>
+                </section>
+              )}
+
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[12px] uppercase tracking-[0.18em] text-text-muted">Citations</h3>
+                  <span className="text-[11px] text-text-muted">{citations.length}</span>
+                </div>
+
+                {citations.length > 0 ? (
+                  citations.map((citation) => (
+                    <a
+                      key={citation.id}
+                      href={citation.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block rounded-[24px] border border-white/8 bg-white/[0.03] p-4 transition hover:border-white/12 hover:bg-white/[0.05]"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[13px] text-text-primary">{citation.title}</p>
+                          {citation.domain && (
+                            <p className="mt-1 text-[11px] text-text-muted">{citation.domain}</p>
+                          )}
+                        </div>
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0 text-text-muted" />
                       </div>
-                      <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-text-muted" />
-                    </div>
-                    <p className="mt-2 line-clamp-3 text-xs leading-5 text-text-secondary">
-                      {source.excerpt}
-                    </p>
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <EmptyCard icon={Globe} text="Fetched pages from research runs will be listed here with their cached excerpts." />
-            )}
-          </section>
-        </div>
-      </div>
-    </motion.aside>
-  );
-}
+                      {citation.excerpt && (
+                        <p className="mt-3 line-clamp-4 text-[12px] text-text-secondary">
+                          {citation.excerpt}
+                        </p>
+                      )}
+                    </a>
+                  ))
+                ) : (
+                  <div className="rounded-[24px] border border-dashed border-white/10 bg-white/[0.02] p-4 text-[12px] text-text-muted">
+                    Citations will appear here after a research-enabled response.
+                  </div>
+                )}
+              </section>
 
-function EmptyCard({
-  icon: Icon,
-  text,
-}: {
-  icon: typeof Link2;
-  text: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-dashed border-border-medium bg-bg-base/60 px-4 py-4">
-      <Icon className="h-4 w-4 text-text-muted" />
-      <p className="mt-3 text-xs leading-5 text-text-muted">{text}</p>
-    </div>
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[12px] uppercase tracking-[0.18em] text-text-muted">Fetched pages</h3>
+                  <span className="text-[11px] text-text-muted">{sources.length}</span>
+                </div>
+
+                {sources.length > 0 ? (
+                  sources.map((source) => (
+                    <a
+                      key={source.id}
+                      href={source.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block rounded-[24px] border border-white/8 bg-white/[0.03] p-4 transition hover:border-white/12 hover:bg-white/[0.05]"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[13px] text-text-primary">{source.title}</p>
+                          {source.domain && (
+                            <p className="mt-1 text-[11px] text-text-muted">{source.domain}</p>
+                          )}
+                        </div>
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+                      </div>
+                      <p className="mt-3 line-clamp-4 text-[12px] text-text-secondary">{source.excerpt}</p>
+                    </a>
+                  ))
+                ) : (
+                  <div className="rounded-[24px] border border-dashed border-white/10 bg-white/[0.02] p-4 text-[12px] text-text-muted">
+                    Retrieved pages and source snapshots will appear here.
+                  </div>
+                )}
+              </section>
+            </div>
+          </motion.aside>
+        </>
+      )}
+    </AnimatePresence>
   );
 }

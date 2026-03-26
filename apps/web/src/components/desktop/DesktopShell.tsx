@@ -1,44 +1,44 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, startTransition } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import React, {
+  useCallback,
+  startTransition,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import { Monitor } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
 import {
-  type AppSettings,
-  type AssistantCitationsEvent,
-  type AssistantTokenEvent,
-  type Citation,
-  type ComposerAttachment,
-  type DesktopContextItem,
-  type DraftContextItem,
-  type DraftThread,
-  type EnsureReadyResult,
-  type Message,
-  type OllamaRuntimeStatusInfo,
-  type QueryFinished,
-  type QueryMode,
-  type ResearchProgressEvent,
-  type RuntimeSettings,
-  type StorageInfo,
-  type ThreadDetail,
-  type ThreadSummary,
-  type WebSource,
-  type Workspace,
-  type WorkspaceContextItem,
+  AppSettings,
+  AssistantCitationsEvent,
+  AssistantTokenEvent,
+  Citation,
+  DesktopContextItem,
+  EnsureReadyResult,
+  Message,
+  ModelInfo,
+  OllamaRuntimeStatusInfo,
+  QueryFinished,
+  QueryMode,
+  ResearchProgressEvent,
+  RuntimeSettings,
+  ThreadDetail,
+  ThreadSummary,
+  WebSource,
+  Workspace,
+  WorkspaceContextItem,
   archiveThread,
-  createDraft,
   createWorkspace,
   deleteThread,
   ensureRuntimeReady,
   exportWorkspaceThread,
   getActiveWorkspace,
   getCachedRuntimeStatus,
-  getDraft,
   getRuntimeConfig,
   getSettings,
-  getStorageInfo,
-  importAttachments,
   isDesktopApp,
   listRuntimeModels,
   listThreadSources,
@@ -49,142 +49,64 @@ import {
   openThread,
   pickAttachmentFiles,
   pickWorkspaceDirectory,
-  removeAttachment,
-  saveDraft,
+  probeRuntime,
   setActiveWorkspace,
   submitDesktopQuery,
+  updateRuntimeConfig,
   updateSettings,
 } from '@/lib/desktop/client';
+
 import { DesktopInspector } from '@/components/desktop-shell/DesktopInspector';
-import { DesktopOnboarding } from '@/components/desktop-shell/DesktopOnboarding';
-import {
-  DesktopSettingsPanel,
-  type DesktopSettingsSnapshot,
-} from '@/components/desktop-shell/DesktopSettingsPanel';
+import { DesktopSettingsPanel } from '@/components/desktop-shell/DesktopSettingsPanel';
 import { DesktopSidebar } from '@/components/desktop-shell/DesktopSidebar';
 import { DesktopWorkspace } from '@/components/desktop-shell/DesktopWorkspace';
-import { deriveTitle, inferWorkspaceName } from '@/components/desktop-shell/utils';
-
-const ACTIVE_DRAFT_KEY = 'vigilante.active_draft_id';
-
-function buildContextItem(item: WorkspaceContextItem): DesktopContextItem {
-  if (item.mcpAction) {
-    return {
-      id: item.id,
-      kind: 'text',
-      title: item.title,
-      path: null,
-      value: null,
-      source: item.source ?? null,
-      mcpAction: item.mcpAction,
-    };
-  }
-
-  return {
-    id: item.id,
-    kind:
-      item.kind === 'directory'
-        ? 'directory'
-        : item.kind === 'thread'
-          ? 'text'
-          : item.kind === 'url'
-            ? 'url'
-            : 'file',
-    title: item.title,
-    path: item.path,
-    value:
-      item.kind === 'thread'
-        ? item.value ?? item.subtitle ?? item.title
-        : item.kind === 'url'
-          ? item.value ?? item.path ?? item.title
-          : item.value ?? null,
-    source: item.source ?? null,
-    mcpAction: item.mcpAction ?? null,
-  };
-}
-
-function desktopContextToDraftContext(item: DesktopContextItem): DraftContextItem {
-  return {
-    kind: item.kind === 'url' ? 'url' : item.kind === 'text' ? 'clipboard_text' : 'file_ref',
-    label: item.title,
-    value: item.value ?? item.path ?? item.title,
-  };
-}
-
-function draftContextToDesktopContext(item: DraftContextItem, index: number): DesktopContextItem {
-  return {
-    id: `draft-context-${index}-${item.label}`,
-    kind: item.kind === 'url' ? 'url' : item.kind === 'clipboard_text' ? 'text' : 'file',
-    title: item.label,
-    value: item.value,
-    path: item.kind === 'file_ref' ? item.value : null,
-  };
-}
+import { PendingAttachment } from '@/components/desktop-shell/types';
+import {
+  buildContextItem,
+  createAttachment,
+  deriveTitle,
+  extractDroppedPaths,
+  inferWorkspaceName,
+} from '@/components/desktop-shell/utils';
 
 export function DesktopShell() {
   const { setTheme } = useTheme();
-  const dragDepth = useRef(0);
 
   const [isDesktop, setIsDesktop] = useState(false);
-  const [isHydrating, setIsHydrating] = useState(true);
-  const [viewportWidth, setViewportWidth] = useState(1440);
-
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWorkspace, setActiveWorkspaceState] = useState<Workspace | null>(null);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [activeThread, setActiveThread] = useState<ThreadDetail | null>(null);
-  const [draft, setDraft] = useState<DraftThread | null>(null);
   const [threadSources, setThreadSources] = useState<WebSource[]>([]);
-  const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
-
   const [query, setQuery] = useState('');
-  const [mode, setMode] = useState<QueryMode>('ask');
+  const [mode, setMode] = useState<QueryMode>('research');
   const [webSearch, setWebSearch] = useState(true);
   const [contextItems, setContextItems] = useState<DesktopContextItem[]>([]);
   const [contextResults, setContextResults] = useState<WorkspaceContextItem[]>([]);
-  const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
-  const [searchThreads, setSearchThreads] = useState('');
-
+  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [streamError, setStreamError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchThreads, setSearchThreads] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
-  const [exportPath, setExportPath] = useState<string | null>(null);
-  const [researchProgress, setResearchProgress] = useState<ResearchProgressEvent | null>(null);
-
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [settingsDraft, setSettingsDraft] = useState<AppSettings | null>(null);
   const [runtimeDraft, setRuntimeDraft] = useState<RuntimeSettings | null>(null);
   const [runtimeStatus, setRuntimeStatus] = useState<OllamaRuntimeStatusInfo | null>(null);
+  const [runtimeModels, setRuntimeModels] = useState<ModelInfo[]>([]);
   const [runtimeBusy, setRuntimeBusy] = useState(false);
-  const [runtimeModels, setRuntimeModels] = useState<Awaited<ReturnType<typeof listRuntimeModels>>>([]);
+  const [settingsBusy, setSettingsBusy] = useState(false);
+  const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
+  const [exportPath, setExportPath] = useState<string | null>(null);
+  const [researchProgress, setResearchProgress] = useState<ResearchProgressEvent | null>(null);
 
-  useEffect(() => {
-    setIsDesktop(isDesktopApp());
-    setViewportWidth(window.innerWidth);
-    const handleResize = () => setViewportWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const sidebarCompact = viewportWidth < 1100 || settingsDraft?.appearance.sidebarCollapsed === true;
-  const inspectorAsDrawer = viewportWidth < 1280;
-  const [inspectorOpen, setInspectorOpen] = useState(!inspectorAsDrawer);
-
-  useEffect(() => {
-    if (!inspectorAsDrawer) {
-      setInspectorOpen(true);
-    }
-  }, [inspectorAsDrawer]);
+  const deferredSearchThreads = useDeferredValue(searchThreads);
 
   const visibleThreads = useMemo(() => {
-    if (!searchThreads.trim()) return threads;
-    const search = searchThreads.toLowerCase();
-    return threads.filter(
-      (thread) =>
-        thread.title.toLowerCase().includes(search) || thread.preview.toLowerCase().includes(search),
-    );
-  }, [searchThreads, threads]);
+    if (!deferredSearchThreads.trim()) return threads;
+
+    const searchValue = deferredSearchThreads.toLowerCase();
+    return threads.filter((thread) => thread.title.toLowerCase().includes(searchValue));
+  }, [deferredSearchThreads, threads]);
 
   const activeCitations = useMemo<Citation[]>(() => {
     const lastAssistant = [...(activeThread?.messages ?? [])]
@@ -194,19 +116,86 @@ export function DesktopShell() {
   }, [activeThread]);
 
   const selectedModelId =
-    runtimeDraft?.defaultModel ?? settingsDraft?.defaultProvider.modelId ?? 'llama3.2';
+    runtimeDraft?.defaultModel ?? settingsDraft?.defaultProvider.modelId ?? 'local-model';
+
+  const syncThread = useCallback(async (threadId: string) => {
+    try {
+      const [detail, sources] = await Promise.all([openThread(threadId), listThreadSources(threadId)]);
+      setActiveThread(detail);
+      setThreadSources(sources);
+    } catch (error) {
+      setStreamError(error instanceof Error ? error.message : 'Failed to load thread');
+    }
+  }, []);
+
+  const reloadThreads = useCallback(
+    async (workspaceId: string, preferredThreadId?: string) => {
+      const nextThreads = await listThreads(workspaceId);
+      setThreads(nextThreads);
+
+      const currentThreadStillVisible = activeThread
+        ? nextThreads.some((thread) => thread.id === activeThread.thread.id)
+        : false;
+      const nextActiveId =
+        preferredThreadId ??
+        (currentThreadStillVisible ? activeThread?.thread.id : undefined) ??
+        nextThreads[0]?.id;
+
+      if (nextActiveId) {
+        await syncThread(nextActiveId);
+      } else {
+        setActiveThread(null);
+        setThreadSources([]);
+      }
+    },
+    [activeThread, syncThread],
+  );
+
+  const hydrateDesktop = useCallback(async () => {
+    try {
+      const [
+        workspace,
+        workspaceList,
+        nextSettings,
+        nextRuntime,
+        nextRuntimeStatus,
+        nextModels,
+      ] = await Promise.all([
+        getActiveWorkspace(),
+        listWorkspaces(),
+        getSettings(),
+        getRuntimeConfig(),
+        getCachedRuntimeStatus(),
+        listRuntimeModels(),
+      ]);
+
+      setActiveWorkspaceState(workspace);
+      setWorkspaces(workspaceList);
+      setSettingsDraft(nextSettings);
+      setRuntimeDraft({
+        ...nextRuntime,
+        defaultModel: nextRuntime.defaultModel ?? nextSettings.defaultProvider.modelId,
+      });
+      setRuntimeStatus(nextRuntimeStatus);
+      setRuntimeModels(nextModels.length > 0 ? nextModels : nextRuntimeStatus.models);
+      setWebSearch(nextSettings.search.enabledByDefault);
+      setTheme(nextSettings.appearance.theme);
+
+      await reloadThreads(workspace.id);
+    } catch (error) {
+      setStreamError(error instanceof Error ? error.message : 'Failed to load desktop state');
+    }
+  }, [reloadThreads, setTheme]);
 
   useEffect(() => {
-    if (settingsDraft) {
-      setTheme(settingsDraft.appearance.theme);
-    }
-  }, [settingsDraft, setTheme]);
+    setIsDesktop(isDesktopApp());
+  }, []);
 
   useEffect(() => {
     if (!isDesktop) return;
+
     void hydrateDesktop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDesktop]);
+  }, [hydrateDesktop, isDesktop]);
 
   useEffect(() => {
     if (!isDesktop) return;
@@ -217,6 +206,7 @@ export function DesktopShell() {
     void (async () => {
       unsubs.push(
         await listenEvent<{ threadId: string }>('vigilante://assistant-started', (payload) => {
+          if (disposed) return;
           setExportPath(null);
           setResearchProgress(null);
           void syncThread(payload.threadId);
@@ -228,6 +218,8 @@ export function DesktopShell() {
 
       unsubs.push(
         await listenEvent<AssistantTokenEvent>('vigilante://assistant-token', (payload) => {
+          if (disposed) return;
+
           startTransition(() => {
             setActiveThread((current) => {
               if (!current || current.thread.id !== payload.threadId) return current;
@@ -266,9 +258,12 @@ export function DesktopShell() {
 
       unsubs.push(
         await listenEvent<AssistantCitationsEvent>('vigilante://assistant-citations', (payload) => {
+          if (disposed) return;
+
           startTransition(() => {
             setActiveThread((current) => {
               if (!current || current.thread.id !== payload.threadId) return current;
+
               return {
                 ...current,
                 messages: current.messages.map((message) =>
@@ -292,6 +287,8 @@ export function DesktopShell() {
 
       unsubs.push(
         await listenEvent<QueryFinished>('vigilante://assistant-finished', (payload) => {
+          if (disposed) return;
+
           void syncThread(payload.threadId);
           if (activeWorkspace) {
             void reloadThreads(activeWorkspace.id, payload.threadId);
@@ -310,8 +307,7 @@ export function DesktopShell() {
       disposed = true;
       unsubs.forEach((unsub) => unsub());
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeWorkspace, isDesktop, mode]);
+  }, [activeWorkspace, isDesktop, mode, reloadThreads, syncThread]);
 
   useEffect(() => {
     if (!activeWorkspace || !query.includes('@')) {
@@ -330,185 +326,58 @@ export function DesktopShell() {
       void lookupContextItems(activeWorkspace.id, mention)
         .then((results) => setContextResults(results))
         .catch(() => setContextResults([]));
-    }, 140);
+    }, 120);
 
     return () => window.clearTimeout(handle);
   }, [activeWorkspace, query]);
 
-  useEffect(() => {
-    if (activeThread || !draft) return;
+  function resetComposerState() {
+    setContextItems([]);
+    setContextResults([]);
+    setAttachments([]);
+  }
 
-    const handle = window.setTimeout(() => {
-      void saveDraft(
-        draft.id,
-        query,
-        contextItems
-          .filter((item) => !item.mcpAction)
-          .map(desktopContextToDraftContext),
-      )
-        .then((saved) => {
-          setDraft((current) => (current && current.id === saved.id ? saved : current));
-        })
-        .catch(() => {
-          // Autosave failures should not block typing.
-        });
-    }, 220);
+  function addAttachmentPaths(paths: string[]) {
+    const nextAttachments = paths.map(createAttachment);
+    if (nextAttachments.length === 0) return;
 
-    return () => window.clearTimeout(handle);
-  }, [activeThread, contextItems, draft, query]);
+    setAttachments((current) => {
+      const merged = [...current];
+      const existing = new Set(current.map((attachment) => attachment.id));
 
-  async function hydrateDesktop() {
-    setIsHydrating(true);
-    try {
-      const [
-        workspace,
-        workspaceList,
-        nextSettings,
-        nextRuntime,
-        nextRuntimeStatus,
-        nextModels,
-        nextStorageInfo,
-      ] = await Promise.all([
-        getActiveWorkspace(),
-        listWorkspaces(),
-        getSettings(),
-        getRuntimeConfig(),
-        getCachedRuntimeStatus(),
-        listRuntimeModels(),
-        getStorageInfo(),
-      ]);
-
-      const restoredDraft = await restoreDraft();
-
-      setActiveWorkspaceState(workspace);
-      setWorkspaces(workspaceList);
-      setSettingsDraft(nextSettings);
-      setRuntimeDraft({
-        ...nextRuntime,
-        defaultModel: nextRuntime.defaultModel ?? nextSettings.defaultProvider.modelId,
+      nextAttachments.forEach((attachment) => {
+        if (!existing.has(attachment.id)) {
+          merged.push(attachment);
+          existing.add(attachment.id);
+        }
       });
-      setRuntimeStatus(nextRuntimeStatus);
-      setRuntimeModels(nextModels.length > 0 ? nextModels : nextRuntimeStatus.models);
-      setStorageInfo(nextStorageInfo);
-      setWebSearch(nextSettings.search.enabledByDefault);
-      setShowOnboarding(!nextSettings.hasCompletedOnboarding);
 
-      const nextThreads = await listThreads(workspace.id);
-      setThreads(nextThreads);
+      return merged;
+    });
 
-      const hasRestoredDraft =
-        restoredDraft &&
-        (restoredDraft.inputText.trim().length > 0 ||
-          restoredDraft.attachments.length > 0 ||
-          restoredDraft.contextItems.length > 0);
+    setContextItems((current) => {
+      const merged = [...current];
+      const existing = new Set(current.map((item) => item.id));
 
-      if (hasRestoredDraft) {
-        activateDraft(restoredDraft);
-      } else if (nextThreads[0]) {
-        await syncThread(nextThreads[0].id);
-      } else {
-        setActiveThread(null);
-        setThreadSources([]);
-        setContextItems([]);
-        setAttachments([]);
-        setQuery('');
-      }
-    } catch (error) {
-      setStreamError(error instanceof Error ? error.message : 'Failed to load desktop state');
-    } finally {
-      setIsHydrating(false);
-    }
-  }
+      nextAttachments.forEach((attachment) => {
+        if (!existing.has(attachment.id)) {
+          merged.push(attachment.contextItem);
+          existing.add(attachment.id);
+        }
+      });
 
-  async function restoreDraft() {
-    if (typeof window === 'undefined') return null;
-    const draftId = window.localStorage.getItem(ACTIVE_DRAFT_KEY);
-    if (!draftId) {
-      setDraft(null);
-      return null;
-    }
-
-    try {
-      const existingDraft = await getDraft(draftId);
-      setDraft(existingDraft);
-      return existingDraft;
-    } catch {
-      window.localStorage.removeItem(ACTIVE_DRAFT_KEY);
-      setDraft(null);
-      return null;
-    }
-  }
-
-  function activateDraft(nextDraft: DraftThread) {
-    setDraft(nextDraft);
-    setActiveThread(null);
-    setThreadSources([]);
-    setQuery(nextDraft.inputText);
-    setContextItems(nextDraft.contextItems.map(draftContextToDesktopContext));
-    setAttachments(nextDraft.attachments);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(ACTIVE_DRAFT_KEY, nextDraft.id);
-    }
-  }
-
-  async function ensureDraftRecord() {
-    if (draft) return draft;
-
-    const provider = settingsDraft?.defaultProvider ?? {
-      providerId: 'ollama',
-      modelId: selectedModelId,
-    };
-    const created = await createDraft(provider);
-    setDraft(created);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(ACTIVE_DRAFT_KEY, created.id);
-    }
-    return created;
-  }
-
-  async function reloadThreads(workspaceId: string, preferredThreadId?: string) {
-    const nextThreads = await listThreads(workspaceId);
-    setThreads(nextThreads);
-
-    if (!activeThread && draft) {
-      return;
-    }
-
-    const currentThreadStillVisible = activeThread
-      ? nextThreads.some((thread) => thread.id === activeThread.thread.id)
-      : false;
-    const nextActiveId =
-      preferredThreadId ??
-      (currentThreadStillVisible ? activeThread?.thread.id : undefined) ??
-      nextThreads[0]?.id;
-
-    if (nextActiveId) {
-      await syncThread(nextActiveId);
-    } else {
-      setActiveThread(null);
-      setThreadSources([]);
-    }
-  }
-
-  async function syncThread(threadId: string) {
-    try {
-      const [detail, sources] = await Promise.all([openThread(threadId), listThreadSources(threadId)]);
-      setActiveThread(detail);
-      setThreadSources(sources);
-      setAttachments(detail.attachments);
-      setContextItems([]);
-      setContextResults([]);
-      setQuery('');
-      setDraft((current) => current);
-    } catch (error) {
-      setStreamError(error instanceof Error ? error.message : 'Failed to load thread');
-    }
+      return merged;
+    });
   }
 
   async function handleWorkspaceSwitch(workspace: Workspace) {
-    setActiveWorkspaceState(workspace);
-    await setActiveWorkspace(workspace.id);
-    await reloadThreads(workspace.id);
+    try {
+      setActiveWorkspaceState(workspace);
+      await setActiveWorkspace(workspace.id);
+      await reloadThreads(workspace.id);
+    } catch (error) {
+      setStreamError(error instanceof Error ? error.message : 'Failed to switch workspaces');
+    }
   }
 
   async function handleCreateWorkspace() {
@@ -519,80 +388,45 @@ export function DesktopShell() {
       const workspace = await createWorkspace(inferWorkspaceName(rootPath), rootPath);
       setActiveWorkspaceState(workspace);
       setWorkspaces(await listWorkspaces());
+      setSettingsNotice(`Workspace added: ${workspace.name}`);
       await reloadThreads(workspace.id);
     } catch (error) {
       setStreamError(error instanceof Error ? error.message : 'Failed to create workspace');
     }
   }
 
-  async function handleNewThread() {
+  async function handlePickAttachments() {
     try {
-      const nextDraft = draft ?? (await ensureDraftRecord());
-      activateDraft(nextDraft);
+      const paths = await pickAttachmentFiles();
+      addAttachmentPaths(paths);
     } catch (error) {
-      setStreamError(error instanceof Error ? error.message : 'Failed to create draft');
+      setStreamError(error instanceof Error ? error.message : 'Failed to attach files');
     }
   }
 
-  async function handleImportAttachmentPaths(candidatePaths?: string[]) {
-    try {
-      const paths = candidatePaths ?? (await pickAttachmentFiles());
-      if (!paths.length) return;
+  function handleDropFiles(files: FileList) {
+    const droppedPaths = extractDroppedPaths(files);
 
-      const ownerId = activeThread?.thread.id ?? (await ensureDraftRecord()).id;
-      const imported = await importAttachments(ownerId, paths);
-      setAttachments(imported);
-
-      if (activeThread) {
-        setActiveThread((current) => (current ? { ...current, attachments: imported } : current));
-      } else {
-        setDraft((current) =>
-          current ? { ...current, attachments: imported, updatedAt: new Date().toISOString() } : current,
-        );
-      }
-    } catch (error) {
-      setStreamError(error instanceof Error ? error.message : 'Failed to import attachments');
+    if (droppedPaths.length === 0) {
+      setSettingsNotice('Drag and drop is not available in this build yet. Use the + button instead.');
+      return;
     }
-  }
 
-  async function handleRemoveAttachment(attachmentId: string) {
-    try {
-      const ownerId = activeThread?.thread.id ?? draft?.id;
-      if (!ownerId) return;
-      await removeAttachment(ownerId, attachmentId);
-      const nextAttachments = attachments.filter((attachment) => attachment.id !== attachmentId);
-      setAttachments(nextAttachments);
-      if (activeThread) {
-        setActiveThread((current) => (current ? { ...current, attachments: nextAttachments } : current));
-      } else {
-        setDraft((current) =>
-          current
-            ? { ...current, attachments: nextAttachments, updatedAt: new Date().toISOString() }
-            : current,
-        );
-      }
-    } catch (error) {
-      setStreamError(error instanceof Error ? error.message : 'Failed to remove attachment');
-    }
+    addAttachmentPaths(droppedPaths);
   }
 
   async function handleSubmit() {
     if (!activeWorkspace || !query.trim() || isSubmitting) return;
 
     const submittedQuery = query.trim();
-    const submitContextItems = [...contextItems];
-    const submitAttachments = [...attachments];
-    const previousDraft = draft;
-    const previousThread = activeThread;
-    let workingDraft = previousDraft;
+    const currentThreadId = activeThread?.thread.id;
 
+    setQuery('');
+    setContextResults([]);
     setStreamError(null);
     setExportPath(null);
-    setResearchProgress(null);
     setIsSubmitting(true);
-    setContextResults([]);
-    setContextItems([]);
-    setQuery('');
+    setInspectorOpen(false);
 
     const optimisticUserMessage: Message = {
       id: `local-user-${Date.now()}`,
@@ -601,20 +435,21 @@ export function DesktopShell() {
       citations: [],
       followUps: [],
       mode,
-      modelUsed: null,
       isComplete: true,
+      modelUsed: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    let draftId: string | null = null;
-    if (!activeThread) {
-      const ensuredDraft = previousDraft ?? (await ensureDraftRecord());
-      workingDraft = ensuredDraft;
-      draftId = ensuredDraft.id;
+    if (activeThread) {
+      setActiveThread({
+        ...activeThread,
+        messages: [...activeThread.messages, optimisticUserMessage],
+      });
+    } else {
       setActiveThread({
         thread: {
-          id: draftId,
+          id: 'pending-thread',
           workspaceId: activeWorkspace.id,
           title: deriveTitle(submittedQuery),
           preview: submittedQuery,
@@ -625,80 +460,149 @@ export function DesktopShell() {
           lastOpenedAt: null,
         },
         messages: [optimisticUserMessage],
-        attachments: submitAttachments,
+        attachments: [],
       });
       setThreadSources([]);
-      setDraft(null);
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(ACTIVE_DRAFT_KEY);
-      }
-    } else {
-      setActiveThread({
-        ...activeThread,
-        messages: [...activeThread.messages, optimisticUserMessage],
-      });
     }
 
     try {
-      await submitDesktopQuery({
+      const submission = await submitDesktopQuery({
         workspaceId: activeWorkspace.id,
-        threadId: activeThread?.thread.id ?? null,
-        draftId,
+        threadId: currentThreadId === 'pending-thread' ? null : currentThreadId,
         query: submittedQuery,
         mode,
         webSearch,
-        contextItems: submitContextItems,
-        attachments: submitAttachments,
+        contextItems,
+        attachments: [],
       });
+
+      setActiveThread((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          thread: {
+            ...current.thread,
+            id: submission.threadId,
+          },
+        };
+      });
+
+      resetComposerState();
+      await reloadThreads(activeWorkspace.id, submission.threadId);
     } catch (error) {
       setIsSubmitting(false);
-      setStreamError(error instanceof Error ? error.message : 'Failed to submit query');
       setQuery(submittedQuery);
-      setContextItems(submitContextItems);
-      setAttachments(submitAttachments);
-      setActiveThread(previousThread);
-      if (!previousThread && workingDraft) {
-        activateDraft(workingDraft);
-      }
+      setStreamError(error instanceof Error ? error.message : 'Failed to submit query');
     }
   }
 
   function handleMentionSelect(item: WorkspaceContextItem) {
     const match = query.match(/(?:^|\s)@([^\s]*)$/);
     if (match) {
-      setQuery((prev) => prev.replace(/(?:^|\s)@([^\s]*)$/, ' '));
+      setQuery((current) => current.replace(/(?:^|\s)@([^\s]*)$/, ' '));
     }
-    setContextItems((prev) => {
-      if (prev.some((existing) => existing.id === item.id)) return prev;
-      return [...prev, buildContextItem(item)];
+
+    setContextItems((current) => {
+      if (current.some((entry) => entry.id === item.id)) return current;
+      return [...current, buildContextItem(item)];
     });
     setContextResults([]);
   }
 
   async function handleArchiveThread(threadId: string) {
-    await archiveThread(threadId);
-    if (activeWorkspace) {
-      await reloadThreads(activeWorkspace.id);
+    try {
+      await archiveThread(threadId);
+      if (activeWorkspace) {
+        await reloadThreads(activeWorkspace.id);
+      }
+    } catch (error) {
+      setStreamError(error instanceof Error ? error.message : 'Failed to archive thread');
     }
   }
 
   async function handleDeleteThread(threadId: string) {
-    await deleteThread(threadId);
-    if (activeWorkspace) {
-      await reloadThreads(activeWorkspace.id);
+    try {
+      await deleteThread(threadId);
+      if (activeWorkspace) {
+        await reloadThreads(activeWorkspace.id);
+      }
+    } catch (error) {
+      setStreamError(error instanceof Error ? error.message : 'Failed to delete thread');
+    }
+  }
+
+  async function handleProbeRuntime() {
+    setRuntimeBusy(true);
+    setSettingsNotice(null);
+
+    try {
+      const status = await probeRuntime();
+      setRuntimeStatus(status);
+      setRuntimeModels(status.models);
+    } catch (error) {
+      setStreamError(error instanceof Error ? error.message : 'Failed to probe runtime');
+    } finally {
+      setRuntimeBusy(false);
     }
   }
 
   async function handleEnsureRuntime() {
     setRuntimeBusy(true);
+    setSettingsNotice(null);
+
     try {
       const result: EnsureReadyResult = await ensureRuntimeReady();
       setRuntimeStatus(result.runtime);
       setRuntimeModels(result.runtime.models);
+      setSettingsNotice(
+        result.startOutcome
+          ? `Runtime status: ${result.startOutcome.replaceAll('_', ' ')}`
+          : 'Runtime checked.',
+      );
     } catch (error) {
       setStreamError(error instanceof Error ? error.message : 'Failed to ensure runtime');
     } finally {
       setRuntimeBusy(false);
+    }
+  }
+
+  async function handleSaveSettings() {
+    if (!settingsDraft || !runtimeDraft) return;
+
+    setSettingsBusy(true);
+    setSettingsNotice(null);
+    setStreamError(null);
+
+    const effectiveModel = runtimeDraft.defaultModel ?? settingsDraft.defaultProvider.modelId;
+    const nextSettings: AppSettings = {
+      ...settingsDraft,
+      defaultProvider: {
+        ...settingsDraft.defaultProvider,
+        providerId: 'ollama',
+        modelId: effectiveModel,
+      },
+    };
+    const nextRuntime: RuntimeSettings = {
+      ...runtimeDraft,
+      defaultModel: effectiveModel,
+    };
+
+    try {
+      const [savedSettings, savedRuntime] = await Promise.all([
+        updateSettings(nextSettings),
+        updateRuntimeConfig(nextRuntime),
+      ]);
+
+      setSettingsDraft(savedSettings);
+      setRuntimeDraft(savedRuntime);
+      setWebSearch(savedSettings.search.enabledByDefault);
+      setTheme(savedSettings.appearance.theme);
+      setSettingsNotice('Desktop settings saved.');
+      setSettingsOpen(false);
+    } catch (error) {
+      setStreamError(error instanceof Error ? error.message : 'Failed to save settings');
+    } finally {
+      setSettingsBusy(false);
     }
   }
 
@@ -708,87 +612,65 @@ export function DesktopShell() {
     try {
       const path = await exportWorkspaceThread(activeThread.thread.id, format);
       setExportPath(path);
+      setSettingsNotice(`Thread exported as ${format.toUpperCase()}.`);
+      setInspectorOpen(true);
     } catch (error) {
       setStreamError(error instanceof Error ? error.message : 'Failed to export thread');
     }
   }
 
-  async function handleCompleteOnboarding() {
-    if (!settingsDraft) {
-      setShowOnboarding(false);
-      return;
-    }
-
-    try {
-      const saved = await updateSettings({
-        ...settingsDraft,
-        hasCompletedOnboarding: true,
-        defaultProvider: {
-          ...settingsDraft.defaultProvider,
-          providerId: 'ollama',
-          modelId: selectedModelId,
-        },
-      });
-      setSettingsDraft(saved);
-      setShowOnboarding(false);
-    } catch (error) {
-      setStreamError(error instanceof Error ? error.message : 'Failed to finish onboarding');
-    }
+  function handleRemoveAttachment(id: string) {
+    setAttachments((current) => current.filter((attachment) => attachment.id !== id));
+    setContextItems((current) => current.filter((item) => item.id !== id));
   }
 
-  function handleSettingsSaved(snapshot: DesktopSettingsSnapshot) {
-    setSettingsDraft(snapshot.settings);
-    setRuntimeDraft(snapshot.runtime);
-    setRuntimeStatus(snapshot.runtimeStatus);
-    setRuntimeModels(snapshot.runtimeModels);
-    setStorageInfo(snapshot.storageInfo);
-    setWebSearch(snapshot.settings.search.enabledByDefault);
+  function handleRemoveContextItem(id: string) {
+    setContextItems((current) => current.filter((item) => item.id !== id));
   }
 
-  function handleDragEnter() {
-    dragDepth.current += 1;
-    setIsDraggingFiles(true);
+  function handleSelectModel(modelId: string) {
+    setRuntimeDraft((current) =>
+      current
+        ? {
+            ...current,
+            defaultModel: modelId,
+          }
+        : current,
+    );
+    setSettingsDraft((current) =>
+      current
+        ? {
+            ...current,
+            defaultProvider: {
+              ...current.defaultProvider,
+              modelId,
+            },
+          }
+        : current,
+    );
   }
 
-  function handleDragLeave() {
-    dragDepth.current = Math.max(0, dragDepth.current - 1);
-    if (dragDepth.current === 0) {
-      setIsDraggingFiles(false);
-    }
-  }
-
-  function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-
-  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    event.stopPropagation();
-    dragDepth.current = 0;
-    setIsDraggingFiles(false);
-
-    const droppedPaths = Array.from(event.dataTransfer.files)
-      .map((file) => (file as File & { path?: string }).path)
-      .filter((value): value is string => Boolean(value));
-
-    if (droppedPaths.length > 0) {
-      void handleImportAttachmentPaths(droppedPaths);
-    } else {
-      setStreamError('Drag and drop did not expose local file paths. Use Upload instead.');
-    }
+  function handleNewThread() {
+    setActiveThread(null);
+    setThreadSources([]);
+    setExportPath(null);
+    setResearchProgress(null);
+    setQuery('');
+    setStreamError(null);
+    resetComposerState();
   }
 
   if (!isDesktop) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg-base px-8 text-text-primary">
-        <div className="desktop-card max-w-2xl text-center">
-          <h1 className="text-3xl font-semibold tracking-[-0.04em] text-text-primary">
-            Vigilante Desktop
-          </h1>
-          <p className="mt-4 text-base leading-7 text-text-secondary">
-            This UI now expects to run inside the Tauri desktop shell. Start it with `pnpm tauri dev`
-            to use local workspaces, drafts, attachments, and saved research threads.
+        <div className="desktop-panel max-w-xl rounded-[32px] p-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent/10 text-accent">
+            <Monitor className="h-6 w-6" />
+          </div>
+          <h1 className="font-serif text-[34px] tracking-[-0.03em] text-[#f1e8df]">Vigilante Desktop</h1>
+          <p className="mt-3 text-[14px] text-text-secondary">
+            This interface is designed for the Tauri desktop shell. Launch the desktop app to use
+            local workspaces, saved chats, runtime controls, and offline research flows.
           </p>
         </div>
       </div>
@@ -796,162 +678,87 @@ export function DesktopShell() {
   }
 
   return (
-    <div className="relative h-screen overflow-hidden bg-bg-base text-text-primary">
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,rgba(244,173,82,0.12),transparent_38%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_22%)]" />
+    <div className="relative flex h-screen overflow-hidden bg-bg-base text-text-primary">
+      <DesktopSidebar
+        activeThreadId={activeThread?.thread.id ?? null}
+        activeWorkspace={activeWorkspace}
+        onArchiveThread={(threadId) => void handleArchiveThread(threadId)}
+        onCreateWorkspace={() => void handleCreateWorkspace()}
+        onDeleteThread={(threadId) => void handleDeleteThread(threadId)}
+        onNewThread={handleNewThread}
+        onOpenInspector={() => setInspectorOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onSearchThreadsChange={setSearchThreads}
+        onSelectThread={(threadId) => void syncThread(threadId)}
+        onSelectWorkspace={(workspace) => void handleWorkspaceSwitch(workspace)}
+        searchThreads={searchThreads}
+        threads={visibleThreads}
+        workspaces={workspaces}
+      />
 
-      <div className="relative flex h-full w-full overflow-hidden">
-        <DesktopSidebar
-          compact={sidebarCompact}
-          searchValue={searchThreads}
-          onSearchValueChange={setSearchThreads}
-          workspaces={workspaces}
-          activeWorkspaceId={activeWorkspace?.id}
-          threads={visibleThreads}
-          activeThreadId={activeThread?.thread.id ?? null}
-          onWorkspaceSelect={(workspace) => void handleWorkspaceSwitch(workspace)}
-          onCreateWorkspace={() => void handleCreateWorkspace()}
-          onThreadOpen={(threadId) => void syncThread(threadId)}
-          onThreadArchive={(threadId) => void handleArchiveThread(threadId)}
-          onThreadDelete={(threadId) => void handleDeleteThread(threadId)}
-          onNewThread={() => void handleNewThread()}
-          onOpenSettings={() => setSettingsOpen(true)}
-          onToggleCompact={() =>
-            setSettingsDraft((current) =>
-              current
-                ? {
-                    ...current,
-                    appearance: {
-                      ...current.appearance,
-                      sidebarCollapsed: !current.appearance.sidebarCollapsed,
-                    },
-                  }
-                : current,
-            )
-          }
-        />
+      <DesktopWorkspace
+        activeCitations={activeCitations}
+        activeThread={activeThread}
+        activeWorkspace={activeWorkspace}
+        attachments={attachments}
+        contextItems={contextItems}
+        contextResults={contextResults}
+        exportPath={exportPath}
+        inspectorOpen={inspectorOpen}
+        isSubmitting={isSubmitting}
+        mode={mode}
+        onDropFiles={handleDropFiles}
+        onExportThread={(format) => void handleExportThread(format)}
+        onMentionSelect={handleMentionSelect}
+        onModeChange={setMode}
+        onOpenInspector={() => setInspectorOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onPickAttachments={() => void handlePickAttachments()}
+        onQueryChange={setQuery}
+        onRemoveAttachment={handleRemoveAttachment}
+        onRemoveContextItem={handleRemoveContextItem}
+        onSelectModel={handleSelectModel}
+        onSubmit={() => void handleSubmit()}
+        onToggleWebSearch={() => setWebSearch((current) => !current)}
+        onUploadImages={() => void handlePickAttachments()}
+        query={query}
+        researchProgress={researchProgress}
+        runtimeModels={runtimeModels}
+        selectedModelId={selectedModelId}
+        settingsNotice={settingsNotice}
+        streamError={streamError}
+        threadSources={threadSources}
+        webSearch={webSearch}
+      />
 
-        <DesktopWorkspace
-          activeWorkspace={activeWorkspace}
-          activeThread={activeThread}
-          query={query}
-          mode={mode}
-          webSearch={webSearch}
-          contextItems={contextItems}
-          contextResults={contextResults}
-          attachments={attachments}
-          researchProgress={researchProgress}
-          isSubmitting={isSubmitting}
-          streamError={streamError}
-          draftActive={!activeThread}
-          inspectorVisible={inspectorOpen}
-          dragActive={isDraggingFiles}
-          onQueryChange={setQuery}
-          onModeChange={setMode}
-          onWebSearchChange={setWebSearch}
-          onSubmit={() => void handleSubmit()}
-          onRemoveContextItem={(id) =>
-            setContextItems((current) => current.filter((item) => item.id !== id))
-          }
-          onMentionSelect={handleMentionSelect}
-          onUploadClick={() => void handleImportAttachmentPaths()}
-          onRemoveAttachment={(attachmentId) => void handleRemoveAttachment(attachmentId)}
-          onToggleInspector={() => setInspectorOpen((current) => !current)}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-        />
+      <DesktopInspector
+        citations={activeCitations}
+        exportPath={exportPath}
+        onClose={() => setInspectorOpen(false)}
+        onEnsureRuntime={() => void handleEnsureRuntime()}
+        open={inspectorOpen}
+        researchProgress={researchProgress}
+        runtimeBusy={runtimeBusy}
+        runtimeStatus={runtimeStatus}
+        sources={threadSources}
+      />
 
-        <AnimatePresence>
-          {inspectorOpen && !inspectorAsDrawer && (
-            <DesktopInspector
-              activeThread={activeThread}
-              citations={activeCitations}
-              attachments={attachments}
-              threadSources={threadSources}
-              runtimeStatus={runtimeStatus}
-              researchProgress={researchProgress}
-              exportPath={exportPath}
-              onExportMarkdown={() => void handleExportThread('md')}
-              onExportJson={() => void handleExportThread('json')}
-              onOpenSettings={() => setSettingsOpen(true)}
-            />
-          )}
-        </AnimatePresence>
-      </div>
-
-      <AnimatePresence>
-        {inspectorOpen && inspectorAsDrawer && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-30 flex justify-end bg-black/35 backdrop-blur-sm"
-            onClick={() => setInspectorOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, x: 28 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 28 }}
-              className="h-full w-full max-w-[380px]"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <DesktopInspector
-                activeThread={activeThread}
-                citations={activeCitations}
-                attachments={attachments}
-                threadSources={threadSources}
-                runtimeStatus={runtimeStatus}
-                researchProgress={researchProgress}
-                exportPath={exportPath}
-                onExportMarkdown={() => void handleExportThread('md')}
-                onExportJson={() => void handleExportThread('json')}
-                onOpenSettings={() => setSettingsOpen(true)}
-              />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {settingsOpen && (
-          <DesktopSettingsPanel
-            onClose={() => setSettingsOpen(false)}
-            onSaved={handleSettingsSaved}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showOnboarding && !isHydrating && (
-          <DesktopOnboarding
-            open={showOnboarding}
-            workspace={activeWorkspace}
-            runtimeStatus={runtimeStatus}
-            runtimeModels={runtimeModels}
-            selectedModelId={selectedModelId}
-            storageInfo={storageInfo}
-            runtimeBusy={runtimeBusy}
-            onEnsureRuntime={() => void handleEnsureRuntime()}
-            onSelectModel={(modelId) => {
-              setRuntimeDraft((current) => (current ? { ...current, defaultModel: modelId } : current));
-              setSettingsDraft((current) =>
-                current
-                  ? {
-                      ...current,
-                      defaultProvider: {
-                        ...current.defaultProvider,
-                        providerId: 'ollama',
-                        modelId,
-                      },
-                    }
-                  : current,
-              );
-            }}
-            onComplete={() => void handleCompleteOnboarding()}
-          />
-        )}
-      </AnimatePresence>
+      <DesktopSettingsPanel
+        onClose={() => setSettingsOpen(false)}
+        onEnsureRuntime={() => void handleEnsureRuntime()}
+        onProbeRuntime={() => void handleProbeRuntime()}
+        onRuntimeChange={setRuntimeDraft}
+        onSave={() => void handleSaveSettings()}
+        onSettingsChange={setSettingsDraft}
+        open={settingsOpen}
+        runtimeBusy={runtimeBusy}
+        runtimeDraft={runtimeDraft}
+        runtimeModels={runtimeModels}
+        runtimeStatus={runtimeStatus}
+        settingsBusy={settingsBusy}
+        settingsDraft={settingsDraft}
+        settingsNotice={settingsNotice}
+      />
     </div>
   );
 }

@@ -40,15 +40,12 @@ module.exports = {
         },
         accent: {
           DEFAULT: "var(--accent)",
-          bright: "var(--accent-bright)",
-          dim: "var(--accent-dim)",
           foreground: "var(--bg-base)",
           hover: "var(--accent-hover)",
           subtle: "var(--accent-subtle)",
+          bright: "var(--accent-bright)",
+          dim: "var(--accent-dim)",
         },
-        success: "var(--success)",
-        warning: "var(--warning)",
-        error: "var(--error)",
         popover: {
           DEFAULT: "var(--bg-surface)",
           foreground: "var(--text-primary)",
@@ -69,6 +66,9 @@ module.exports = {
         'text-secondary': 'var(--text-secondary)',
         'text-muted': 'var(--text-muted)',
         'text-ghost': 'var(--text-ghost)',
+        success: 'var(--success)',
+        warning: 'var(--warning)',
+        error: 'var(--error)',
       },
       borderRadius: {
         lg: "6px",
