@@ -43,6 +43,8 @@ module.exports = {
           foreground: "var(--bg-base)",
           hover: "var(--accent-hover)",
           subtle: "var(--accent-subtle)",
+          bright: "var(--accent-bright)",
+          dim: "var(--accent-dim)",
         },
         popover: {
           DEFAULT: "var(--bg-surface)",
@@ -55,12 +57,18 @@ module.exports = {
         'bg-base': 'var(--bg-base)',
         'bg-surface': 'var(--bg-surface)',
         'bg-elevated': 'var(--bg-elevated)',
+        'bg-overlay': 'var(--bg-overlay)',
         'bg-input': 'var(--bg-input)',
         'border-subtle': 'var(--border-subtle)',
+        'border-medium': 'var(--border-medium)',
         'border-strong': 'var(--border-strong)',
         'text-primary': 'var(--text-primary)',
         'text-secondary': 'var(--text-secondary)',
         'text-muted': 'var(--text-muted)',
+        'text-ghost': 'var(--text-ghost)',
+        success: 'var(--success)',
+        warning: 'var(--warning)',
+        error: 'var(--error)',
       },
       borderRadius: {
         lg: "6px",
@@ -69,7 +77,7 @@ module.exports = {
       },
       fontFamily: {
         serif: ["var(--font-serif)", "serif"],
-        sans: ["var(--font-serif)", "serif"], // Map sans to serif to enforce the global change
+        sans: ["var(--font-sans)", "sans-serif"],
         mono: ["var(--font-mono)", "monospace"],
       },
     },
