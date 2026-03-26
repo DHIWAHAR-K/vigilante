@@ -2,6 +2,7 @@ pub mod activity;
 pub mod attachment;
 pub mod desktop;
 pub mod index;
+pub mod mcp;
 pub mod message;
 pub mod runtime;
 pub mod settings;

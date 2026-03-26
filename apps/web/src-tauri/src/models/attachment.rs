@@ -21,6 +21,8 @@ pub struct AttachmentMetadata {
     /// File extension without leading dot, e.g. "pdf", "txt", "png".
     pub extension: String,
     pub mime_type: String,
+    #[serde(default)]
+    pub kind: AttachmentKind,
     pub size_bytes: u64,
     /// Whether `extracted.txt` is present alongside this metadata.
     pub has_extracted_text: bool,
@@ -34,4 +36,43 @@ impl AttachmentMetadata {
     pub fn original_filename_on_disk(&self) -> String {
         format!("original.{}", self.extension)
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AttachmentKind {
+    Image,
+    Document,
+    Code,
+    Data,
+    #[default]
+    Other,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttachmentSummary {
+    pub id: Uuid,
+    pub display_name: String,
+    pub original_filename: String,
+    pub mime_type: String,
+    pub size_bytes: u64,
+    pub kind: AttachmentKind,
+    pub preview_data_url: Option<String>,
+    pub original_path: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ComposerAttachment {
+    pub id: Uuid,
+    pub display_name: String,
+    pub original_filename: String,
+    pub mime_type: String,
+    pub size_bytes: u64,
+    pub kind: AttachmentKind,
+    pub preview_data_url: Option<String>,
+    pub original_path: String,
+    pub created_at: DateTime<Utc>,
 }

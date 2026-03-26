@@ -56,9 +56,7 @@ pub fn unarchive_thread(paths: &StoragePaths, id: &Uuid) -> VResult<ThreadIndexE
 /// Permanently delete a thread file (and its attachment directory if present).
 /// Returns the thread title for activity logging (best-effort; empty string if not found).
 pub fn delete_thread(paths: &StoragePaths, id: &Uuid) -> VResult<String> {
-    let title = open_thread(paths, id)
-        .map(|t| t.title)
-        .unwrap_or_default();
+    let title = open_thread(paths, id).map(|t| t.title).unwrap_or_default();
 
     let path = paths.thread_file(id);
     if path.exists() {
@@ -76,7 +74,11 @@ pub fn delete_thread(paths: &StoragePaths, id: &Uuid) -> VResult<String> {
 }
 
 /// Append a message to an existing thread.
-pub fn add_message(paths: &StoragePaths, thread_id: &Uuid, message: Message) -> VResult<ThreadIndexEntry> {
+pub fn add_message(
+    paths: &StoragePaths,
+    thread_id: &Uuid,
+    message: Message,
+) -> VResult<ThreadIndexEntry> {
     let mut thread = open_thread(paths, thread_id)?;
     thread.messages.push(message);
     thread.updated_at = Utc::now();
@@ -120,12 +122,11 @@ pub fn flush_index(paths: &StoragePaths, index: &ThreadIndex) -> VResult<()> {
 
 /// Derive a lightweight `ThreadIndexEntry` from a full `PersistedThread`.
 pub fn index_entry_from_thread(thread: &PersistedThread) -> ThreadIndexEntry {
-    let last = thread.messages.iter().rev().find(|m| {
-        matches!(
-            m.role,
-            crate::models::message::MessageRole::Assistant
-        )
-    });
+    let last = thread
+        .messages
+        .iter()
+        .rev()
+        .find(|m| matches!(m.role, crate::models::message::MessageRole::Assistant));
 
     let preview = thread.preview();
 

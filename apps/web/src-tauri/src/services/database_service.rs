@@ -9,6 +9,7 @@ use uuid::Uuid;
 use crate::error::{VError, VResult};
 use crate::models::desktop::{ThreadDetail, ThreadSummary, WebSource};
 use crate::models::message::{Citation, Message, MessageRole, ModelUsed, QueryMode};
+use crate::models::runtime::{ModelInstallJob, ModelInstallStatus};
 use crate::models::settings::ProviderConfig;
 use crate::models::thread::PersistedThread;
 use crate::models::workspace::{CreateWorkspaceRequest, Workspace};
@@ -100,10 +101,25 @@ impl AppDatabase {
                     content_text  TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS model_install_jobs (
+                    id                TEXT PRIMARY KEY,
+                    model_id          TEXT NOT NULL,
+                    status            TEXT NOT NULL,
+                    progress_percent  INTEGER NOT NULL DEFAULT 0,
+                    downloaded_bytes  INTEGER,
+                    total_bytes       INTEGER,
+                    message           TEXT,
+                    error             TEXT,
+                    created_at        TEXT NOT NULL,
+                    updated_at        TEXT NOT NULL,
+                    completed_at      TEXT
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_workspaces_active ON workspaces(is_active);
                 CREATE INDEX IF NOT EXISTS idx_threads_workspace_updated ON threads(workspace_id, updated_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_messages_thread_created ON messages(thread_id, created_at ASC);
                 CREATE INDEX IF NOT EXISTS idx_citations_message ON citations(message_id, citation_idx ASC);
+                CREATE INDEX IF NOT EXISTS idx_model_install_jobs_model_status ON model_install_jobs(model_id, status, updated_at DESC);
                 "#,
             )
         })?;
@@ -114,7 +130,9 @@ impl AppDatabase {
 
     pub fn import_legacy_json_threads(&self, paths: &StoragePaths) -> VResult<()> {
         let has_threads = self.with_conn(|conn| {
-            conn.query_row("SELECT EXISTS(SELECT 1 FROM threads LIMIT 1)", [], |row| row.get::<_, i64>(0))
+            conn.query_row("SELECT EXISTS(SELECT 1 FROM threads LIMIT 1)", [], |row| {
+                row.get::<_, i64>(0)
+            })
         })?;
         if has_threads > 0 {
             return Ok(());
@@ -244,11 +262,30 @@ impl AppDatabase {
             )
         })?;
 
-        Ok(ThreadDetail { thread, messages })
+        Ok(ThreadDetail {
+            thread,
+            messages,
+            attachments: Vec::new(),
+        })
     }
 
-    pub fn create_thread(&self, workspace_id: Uuid, query: &str, mode: QueryMode) -> VResult<ThreadSummary> {
+    pub fn create_thread(
+        &self,
+        workspace_id: Uuid,
+        query: &str,
+        mode: QueryMode,
+    ) -> VResult<ThreadSummary> {
         let id = Uuid::new_v4();
+        self.create_thread_with_id(id, workspace_id, query, mode)
+    }
+
+    pub fn create_thread_with_id(
+        &self,
+        id: Uuid,
+        workspace_id: Uuid,
+        query: &str,
+        mode: QueryMode,
+    ) -> VResult<ThreadSummary> {
         let now = now_string();
         let title = derive_title(query);
         self.with_conn(|conn| {
@@ -264,7 +301,10 @@ impl AppDatabase {
 
     pub fn delete_thread(&self, thread_id: Uuid) -> VResult<()> {
         self.with_conn(|conn| {
-            conn.execute("DELETE FROM threads WHERE id = ?1", params![thread_id.to_string()])?;
+            conn.execute(
+                "DELETE FROM threads WHERE id = ?1",
+                params![thread_id.to_string()],
+            )?;
             Ok(())
         })
     }
@@ -339,9 +379,15 @@ impl AppDatabase {
                     if is_complete { 1 } else { 0 },
                     model_used.as_ref().map(|model| model.provider_id.clone()),
                     model_used.as_ref().map(|model| model.model_id.clone()),
-                    model_used.as_ref().and_then(|model| model.tokens_in.map(i64::from)),
-                    model_used.as_ref().and_then(|model| model.tokens_out.map(i64::from)),
-                    model_used.as_ref().and_then(|model| model.latency_ms.map(i64::from)),
+                    model_used
+                        .as_ref()
+                        .and_then(|model| model.tokens_in.map(i64::from)),
+                    model_used
+                        .as_ref()
+                        .and_then(|model| model.tokens_out.map(i64::from)),
+                    model_used
+                        .as_ref()
+                        .and_then(|model| model.latency_ms.map(i64::from)),
                     now_string(),
                 ],
             )?;
@@ -457,6 +503,70 @@ impl AppDatabase {
         })
     }
 
+    pub fn upsert_model_install_job(&self, job: &ModelInstallJob) -> VResult<()> {
+        self.with_conn(|conn| {
+            conn.execute(
+                "INSERT INTO model_install_jobs
+                 (id, model_id, status, progress_percent, downloaded_bytes, total_bytes, message, error, created_at, updated_at, completed_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+                 ON CONFLICT(id) DO UPDATE SET
+                    model_id = excluded.model_id,
+                    status = excluded.status,
+                    progress_percent = excluded.progress_percent,
+                    downloaded_bytes = excluded.downloaded_bytes,
+                    total_bytes = excluded.total_bytes,
+                    message = excluded.message,
+                    error = excluded.error,
+                    updated_at = excluded.updated_at,
+                    completed_at = excluded.completed_at",
+                params![
+                    job.id.to_string(),
+                    job.model_id,
+                    model_install_status_to_str(&job.status),
+                    i64::from(job.progress_percent),
+                    job.downloaded_bytes.map(|value| value.min(i64::MAX as u64) as i64),
+                    job.total_bytes.map(|value| value.min(i64::MAX as u64) as i64),
+                    job.message,
+                    job.error,
+                    job.created_at.to_rfc3339(),
+                    job.updated_at.to_rfc3339(),
+                    job.completed_at.map(|value| value.to_rfc3339()),
+                ],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn get_model_install_job(&self, job_id: Uuid) -> VResult<Option<ModelInstallJob>> {
+        self.with_conn(|conn| {
+            conn.query_row(
+                "SELECT id, model_id, status, progress_percent, downloaded_bytes, total_bytes, message, error, created_at, updated_at, completed_at
+                 FROM model_install_jobs
+                 WHERE id = ?1
+                 LIMIT 1",
+                params![job_id.to_string()],
+                model_install_job_from_row,
+            )
+            .optional()
+        })
+    }
+
+    pub fn get_active_model_install_job(&self, model_id: &str) -> VResult<Option<ModelInstallJob>> {
+        self.with_conn(|conn| {
+            conn.query_row(
+                "SELECT id, model_id, status, progress_percent, downloaded_bytes, total_bytes, message, error, created_at, updated_at, completed_at
+                 FROM model_install_jobs
+                 WHERE model_id = ?1
+                   AND status IN ('queued', 'downloading', 'verifying')
+                 ORDER BY updated_at DESC
+                 LIMIT 1",
+                params![model_id],
+                model_install_job_from_row,
+            )
+            .optional()
+        })
+    }
+
     pub fn build_persisted_thread(
         &self,
         thread_id: Uuid,
@@ -541,7 +651,11 @@ impl AppDatabase {
         query_mode_from_str(&mode).map_err(VError::Other)
     }
 
-    fn upsert_imported_thread(&self, workspace_id: &Uuid, thread: &PersistedThread) -> VResult<ThreadSummary> {
+    fn upsert_imported_thread(
+        &self,
+        workspace_id: &Uuid,
+        thread: &PersistedThread,
+    ) -> VResult<ThreadSummary> {
         self.with_conn(|conn| {
             conn.execute(
                 "INSERT OR REPLACE INTO threads
@@ -568,7 +682,9 @@ impl AppDatabase {
 
     fn ensure_default_workspace(&self) -> VResult<()> {
         let count = self.with_conn(|conn| {
-            conn.query_row("SELECT COUNT(*) FROM workspaces", [], |row| row.get::<_, i64>(0))
+            conn.query_row("SELECT COUNT(*) FROM workspaces", [], |row| {
+                row.get::<_, i64>(0)
+            })
         })?;
         if count > 0 {
             return Ok(());
@@ -656,6 +772,30 @@ fn message_from_row(row: &Row<'_>) -> rusqlite::Result<Message> {
     })
 }
 
+fn model_install_job_from_row(row: &Row<'_>) -> rusqlite::Result<ModelInstallJob> {
+    Ok(ModelInstallJob {
+        id: parse_uuid(row.get::<_, String>(0)?).map_err(to_sql_error)?,
+        model_id: row.get(1)?,
+        status: model_install_status_from_str(&row.get::<_, String>(2)?).map_err(to_sql_error)?,
+        progress_percent: row.get::<_, i64>(3)?.clamp(0, 100) as u8,
+        downloaded_bytes: row
+            .get::<_, Option<i64>>(4)?
+            .map(|value| value.max(0) as u64),
+        total_bytes: row
+            .get::<_, Option<i64>>(5)?
+            .map(|value| value.max(0) as u64),
+        message: row.get(6)?,
+        error: row.get(7)?,
+        created_at: parse_datetime(&row.get::<_, String>(8)?).map_err(to_sql_error)?,
+        updated_at: parse_datetime(&row.get::<_, String>(9)?).map_err(to_sql_error)?,
+        completed_at: row
+            .get::<_, Option<String>>(10)?
+            .map(|value| parse_datetime(&value))
+            .transpose()
+            .map_err(to_sql_error)?,
+    })
+}
+
 fn parse_uuid(value: String) -> Result<Uuid, String> {
     Uuid::parse_str(&value).map_err(|err| err.to_string())
 }
@@ -707,6 +847,29 @@ fn query_mode_from_str(value: &str) -> Result<QueryMode, String> {
         "deep_research" => Ok(QueryMode::DeepResearch),
         "rag" => Ok(QueryMode::Rag),
         other => Err(format!("Unknown query mode: {other}")),
+    }
+}
+
+fn model_install_status_to_str(status: &ModelInstallStatus) -> &'static str {
+    match status {
+        ModelInstallStatus::Queued => "queued",
+        ModelInstallStatus::Downloading => "downloading",
+        ModelInstallStatus::Verifying => "verifying",
+        ModelInstallStatus::Complete => "complete",
+        ModelInstallStatus::Failed => "failed",
+        ModelInstallStatus::Cancelled => "cancelled",
+    }
+}
+
+fn model_install_status_from_str(value: &str) -> Result<ModelInstallStatus, String> {
+    match value {
+        "queued" => Ok(ModelInstallStatus::Queued),
+        "downloading" => Ok(ModelInstallStatus::Downloading),
+        "verifying" => Ok(ModelInstallStatus::Verifying),
+        "complete" => Ok(ModelInstallStatus::Complete),
+        "failed" => Ok(ModelInstallStatus::Failed),
+        "cancelled" => Ok(ModelInstallStatus::Cancelled),
+        other => Err(format!("Unknown model install status: {other}")),
     }
 }
 

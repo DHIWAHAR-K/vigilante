@@ -1,4 +1,9 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use parking_lot::RwLock;
+use tokio::task::JoinHandle;
+use uuid::Uuid;
 
 use crate::models::index::ThreadIndex;
 use crate::services::database_service::AppDatabase;
@@ -19,6 +24,9 @@ pub struct AppState {
     /// Using `parking_lot::RwLock` for cheap concurrent reads (sidebar polling).
     /// Writers must also persist changes to disk via `thread_service::flush_index`.
     pub thread_index: RwLock<ThreadIndex>,
+
+    /// Active background model install tasks keyed by install job id.
+    pub install_tasks: Arc<RwLock<HashMap<Uuid, JoinHandle<()>>>>,
 }
 
 impl AppState {
@@ -27,6 +35,7 @@ impl AppState {
             paths,
             db,
             thread_index: RwLock::new(thread_index),
+            install_tasks: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }

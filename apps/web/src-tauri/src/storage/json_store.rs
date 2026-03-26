@@ -74,10 +74,7 @@ pub fn append_jsonl<T: Serialize>(path: &Path, value: &T) -> VResult<()> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)?;
+    let mut file = OpenOptions::new().create(true).append(true).open(path)?;
     serde_json::to_writer(&mut file, value)?;
     file.write_all(b"\n")?;
     Ok(())

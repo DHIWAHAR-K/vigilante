@@ -59,16 +59,18 @@ pub async fn fetch_url(paths: &StoragePaths, url: &str) -> VResult<WebSource> {
         .await
         .map_err(|err| VError::Other(format!("Failed to read Scrapling response: {err}")))?;
 
-    let status = child.wait().await.map_err(|err| VError::Other(format!("Failed to wait for Scrapling worker: {err}")))?;
+    let status = child
+        .wait()
+        .await
+        .map_err(|err| VError::Other(format!("Failed to wait for Scrapling worker: {err}")))?;
     if !status.success() {
         return Err(VError::Other(format!(
             "Scrapling worker exited with status {status}"
         )));
     }
 
-    let response: WorkerResponse = serde_json::from_str(line.trim()).map_err(|err| {
-        VError::Other(format!("Invalid Scrapling worker response: {err}"))
-    })?;
+    let response: WorkerResponse = serde_json::from_str(line.trim())
+        .map_err(|err| VError::Other(format!("Invalid Scrapling worker response: {err}")))?;
 
     if !response.ok {
         return Err(VError::Other(
@@ -86,7 +88,9 @@ pub async fn fetch_url(paths: &StoragePaths, url: &str) -> VResult<WebSource> {
         id: source_id,
         url: response.url.unwrap_or_else(|| url.to_string()),
         title: response.title.unwrap_or_else(|| url.to_string()),
-        excerpt: response.excerpt.unwrap_or_else(|| content_text.chars().take(300).collect()),
+        excerpt: response
+            .excerpt
+            .unwrap_or_else(|| content_text.chars().take(300).collect()),
         domain: url::Url::parse(url)
             .ok()
             .and_then(|parsed| parsed.domain().map(|domain| domain.to_string())),

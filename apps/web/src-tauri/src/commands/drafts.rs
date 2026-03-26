@@ -4,9 +4,11 @@ use uuid::Uuid;
 use crate::error::VResult;
 use crate::models::message::Message;
 use crate::models::settings::ProviderConfig;
-use crate::models::thread::{DraftThread, PersistedThread};
+use crate::models::thread::{DraftContextItem, DraftThread, PersistedThread};
 use crate::services::activity_service::{log_message_sent, log_thread_created};
-use crate::services::draft_service::{create_draft, discard_draft, promote_draft, save_draft_input};
+use crate::services::draft_service::{
+    create_draft, discard_draft, get_draft, promote_draft, save_draft,
+};
 use crate::services::thread_service::flush_index;
 use crate::state::AppState;
 
@@ -20,14 +22,20 @@ pub fn create_draft_cmd(
     create_draft(&state.paths, provider)
 }
 
-/// Save the current composer text to the draft file (call this debounced on input).
+#[tauri::command]
+pub fn get_draft_cmd(state: State<'_, AppState>, id: Uuid) -> VResult<DraftThread> {
+    get_draft(&state.paths, &id)
+}
+
+/// Save the current composer text + context to the draft file (call this debounced on input).
 #[tauri::command]
 pub fn save_draft_cmd(
     state: State<'_, AppState>,
     id: Uuid,
     input_text: String,
+    context_items: Vec<DraftContextItem>,
 ) -> VResult<DraftThread> {
-    save_draft_input(&state.paths, &id, input_text)
+    save_draft(&state.paths, &id, input_text, context_items)
 }
 
 /// Discard a draft (e.g. user pressed Escape or closed a new-chat panel).

@@ -1,17 +1,22 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use futures_util::StreamExt;
 use tauri::{AppHandle, Emitter};
+use tokio::time::sleep;
 use uuid::Uuid;
 
 use crate::error::{VError, VResult};
 use crate::models::desktop::{
-    DesktopContextItem, DesktopContextKind, DesktopQueryRequest, QueryFinished,
-    QuerySubmission, ResearchProgressEvent,
+    DesktopContextItem, DesktopContextKind, DesktopQueryRequest, QueryFinished, QuerySubmission,
+    ResearchProgressEvent,
 };
 use crate::models::message::{Citation, Message, ModelUsed};
 use crate::models::settings::{AppSettings, RuntimeSettings};
+use crate::services::attachment_service::attachment_context_blocks;
 use crate::services::database_service::AppDatabase;
+use crate::services::draft_service::discard_draft;
+use crate::services::mcp_service::collect_context_blocks;
+use crate::services::model_service::{ensure_model_available, normalize_model_id};
 use crate::services::runtime_service::ensure_runtime_ready;
 use crate::services::web_service::{discover_urls, fetch_sources};
 use crate::storage::json_store::read_json_or_default;
@@ -31,26 +36,57 @@ pub async fn submit_query(
 ) -> VResult<QuerySubmission> {
     let settings: AppSettings = read_json_or_default(paths.settings().as_path());
     let runtime_config: RuntimeSettings = read_json_or_default(paths.runtime_config().as_path());
+    let workspace = db.get_workspace(request.workspace_id)?;
 
-    let provider = settings.default_provider.clone();
-    if provider.provider_id != "ollama" {
-        return Err(VError::Other(format!(
-            "Desktop query currently supports the Ollama runtime path; selected provider was {}",
-            provider.provider_id
-        )));
-    }
+    let mut provider = settings.default_provider.clone();
+    provider.provider_id = "ollama".into();
+    provider.model_id = normalize_model_id(&provider.model_id);
 
     let mut thread_id = request.thread_id;
     if thread_id.is_none() {
-        thread_id = Some(db.create_thread(request.workspace_id, &request.query, request.mode.clone())?.id);
+        if let Some(draft_id) = request.draft_id {
+            thread_id = Some(
+                db.create_thread_with_id(
+                    draft_id,
+                    request.workspace_id,
+                    &request.query,
+                    request.mode.clone(),
+                )?
+                .id,
+            );
+            let _ = discard_draft(paths, &draft_id);
+        } else {
+            thread_id = Some(
+                db.create_thread(request.workspace_id, &request.query, request.mode.clone())?
+                    .id,
+            );
+        }
     }
     let thread_id = thread_id.expect("thread id is set");
+    let attachment_context = attachment_context_blocks(paths, &thread_id)?;
 
     let user_message = Message::new_user(request.query.clone(), request.mode.clone());
     db.insert_message(&thread_id, &user_message)?;
 
     let history = db.list_messages(thread_id)?;
 
+    emit_research_progress(
+        app,
+        thread_id,
+        "model",
+        &format!("Preparing model {}.", provider.model_id),
+    );
+    if let Some(job) = db.get_active_model_install_job(&provider.model_id)? {
+        emit_research_progress(
+            app,
+            thread_id,
+            "model",
+            &format!("Waiting for {} to finish installing.", provider.model_id),
+        );
+        wait_for_model_install(db, job.id).await?;
+    } else {
+        ensure_model_available(paths, &provider.model_id).await?;
+    }
     let assistant_message = Message::new_assistant(
         request.mode.clone(),
         ModelUsed {
@@ -82,13 +118,23 @@ pub async fn submit_query(
     );
 
     let web_sources = if request.web_search {
-        emit_research_progress(app, thread_id, "discovery", "Discovering candidate web sources.");
+        emit_research_progress(
+            app,
+            thread_id,
+            "discovery",
+            "Discovering candidate web sources.",
+        );
         let search_results = discover_urls(&request.query, &settings.search).await?;
         emit_research_progress(
             app,
             thread_id,
             "scraping",
-            &format!("Fetching {} web sources with Scrapling.", search_results.len().min(max_sources_for_mode(&request.mode))),
+            &format!(
+                "Fetching {} web sources with Scrapling.",
+                search_results
+                    .len()
+                    .min(max_sources_for_mode(&request.mode))
+            ),
         );
         fetch_sources(paths, &search_results, max_sources_for_mode(&request.mode)).await?
     } else {
@@ -96,7 +142,44 @@ pub async fn submit_query(
     };
     db.save_web_sources(thread_id, assistant_message_id, &web_sources)?;
     let citations = to_citations(&web_sources);
-    emit_research_progress(app, thread_id, "synthesis", "Synthesizing the final answer.");
+    let mut prompt_context_items = request.context_items.clone();
+    let mcp_context_blocks = collect_context_blocks(
+        paths,
+        &settings,
+        &workspace,
+        &request.query,
+        &request.context_items,
+    )
+    .await;
+    if !mcp_context_blocks.is_empty() {
+        emit_research_progress(
+            app,
+            thread_id,
+            "mcp",
+            &format!(
+                "Collected {} MCP context block(s).",
+                mcp_context_blocks.len()
+            ),
+        );
+
+        for (index, block) in mcp_context_blocks.into_iter().enumerate() {
+            prompt_context_items.push(DesktopContextItem {
+                id: format!("mcp-context-{thread_id}-{index}"),
+                kind: DesktopContextKind::Text,
+                title: format!("MCP · {}", block.title),
+                path: None,
+                value: Some(block.body),
+                source: Some("mcp".into()),
+                mcp_action: None,
+            });
+        }
+    }
+    emit_research_progress(
+        app,
+        thread_id,
+        "synthesis",
+        "Synthesizing the final answer.",
+    );
 
     let started = Instant::now();
     let model_used = stream_ollama_response(
@@ -109,7 +192,8 @@ pub async fn submit_query(
         assistant_message_id,
         &history,
         &request.query,
-        &request.context_items,
+        &prompt_context_items,
+        &attachment_context,
         &citations,
     )
     .await?;
@@ -165,6 +249,7 @@ async fn stream_ollama_response(
     history: &[Message],
     query: &str,
     context_items: &[DesktopContextItem],
+    attachment_context: &[String],
     citations: &[Citation],
 ) -> VResult<ModelUsed> {
     let ensured = ensure_runtime_ready(paths, runtime_config).await?;
@@ -175,7 +260,8 @@ async fn stream_ollama_response(
     }
 
     let client = reqwest::Client::new();
-    let prompt_messages = build_prompt_messages(history, query, context_items, citations);
+    let prompt_messages =
+        build_prompt_messages(history, query, context_items, attachment_context, citations);
     let response = client
         .post(format!(
             "{}/api/chat",
@@ -192,7 +278,10 @@ async fn stream_ollama_response(
     let response_status = response.status();
     if !response_status.is_success() {
         let body = response.text().await.unwrap_or_default();
-        return Err(VError::Ollama(format!("Ollama error {}: {}", response_status, body)));
+        return Err(VError::Ollama(format!(
+            "Ollama error {}: {}",
+            response_status, body
+        )));
     }
 
     let mut full_content = String::new();
@@ -241,7 +330,13 @@ async fn stream_ollama_response(
             }
 
             full_content.push_str(token);
-            db.update_assistant_message(thread_id, assistant_message_id, full_content.clone(), false, None)?;
+            db.update_assistant_message(
+                thread_id,
+                assistant_message_id,
+                full_content.clone(),
+                false,
+                None,
+            )?;
             app.emit(
                 EVENT_ASSISTANT_TOKEN,
                 serde_json::json!({
@@ -281,10 +376,11 @@ fn build_prompt_messages(
     history: &[Message],
     query: &str,
     context_items: &[DesktopContextItem],
+    attachment_context: &[String],
     citations: &[Citation],
 ) -> Vec<serde_json::Value> {
     let mut messages = Vec::new();
-    let system_prompt = build_system_prompt(context_items, citations);
+    let system_prompt = build_system_prompt(context_items, attachment_context, citations);
     messages.push(serde_json::json!({
         "role": "system",
         "content": system_prompt,
@@ -309,7 +405,11 @@ fn build_prompt_messages(
     messages
 }
 
-fn build_system_prompt(context_items: &[DesktopContextItem], citations: &[Citation]) -> String {
+fn build_system_prompt(
+    context_items: &[DesktopContextItem],
+    attachment_context: &[String],
+    citations: &[Citation],
+) -> String {
     let mut sections = vec![
         "You are Vigilante, a local-first research assistant running in a desktop app.".to_string(),
         "When sources are provided, ground the answer in them and reference source numbers like [1], [2] in plain text.".to_string(),
@@ -321,12 +421,19 @@ fn build_system_prompt(context_items: &[DesktopContextItem], citations: &[Citati
         sections.push(local_context);
     }
 
+    if !attachment_context.is_empty() {
+        sections.push("Attachments available to use as context:".into());
+        sections.push(attachment_context.join("\n\n"));
+    }
+
     if !citations.is_empty() {
         sections.push("Web sources available to cite:".into());
         sections.push(
             citations
                 .iter()
-                .map(|citation| format!("[{}] {} ({})", citation.index, citation.title, citation.url))
+                .map(|citation| {
+                    format!("[{}] {} ({})", citation.index, citation.title, citation.url)
+                })
                 .collect::<Vec<_>>()
                 .join("\n"),
         );
@@ -339,6 +446,10 @@ fn collect_local_context(context_items: &[DesktopContextItem]) -> String {
     let mut parts = Vec::new();
 
     for item in context_items {
+        if item.mcp_action.is_some() {
+            continue;
+        }
+
         match item.kind {
             DesktopContextKind::File | DesktopContextKind::Text => {
                 if let Some(value) = item.value.as_deref() {
@@ -403,5 +514,31 @@ fn max_sources_for_mode(mode: &crate::models::message::QueryMode) -> usize {
         crate::models::message::QueryMode::DeepResearch => 5,
         crate::models::message::QueryMode::Research => 4,
         _ => 3,
+    }
+}
+
+async fn wait_for_model_install(db: &AppDatabase, job_id: Uuid) -> VResult<()> {
+    loop {
+        let Some(job) = db.get_model_install_job(job_id)? else {
+            return Ok(());
+        };
+
+        match job.status {
+            crate::models::runtime::ModelInstallStatus::Queued
+            | crate::models::runtime::ModelInstallStatus::Downloading
+            | crate::models::runtime::ModelInstallStatus::Verifying => {
+                sleep(Duration::from_millis(500)).await;
+            }
+            crate::models::runtime::ModelInstallStatus::Complete => return Ok(()),
+            crate::models::runtime::ModelInstallStatus::Cancelled => {
+                return Err(VError::Other("Model installation was cancelled".into()))
+            }
+            crate::models::runtime::ModelInstallStatus::Failed => {
+                return Err(VError::Other(
+                    job.error
+                        .unwrap_or_else(|| "Model installation failed".into()),
+                ))
+            }
+        }
     }
 }

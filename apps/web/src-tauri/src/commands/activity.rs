@@ -20,9 +20,9 @@ pub fn export_thread_cmd(
     id: uuid::Uuid,
     format: String,
 ) -> VResult<String> {
+    use crate::services::activity_service::log_export_created;
     use crate::services::export_service::{export_thread_json, export_thread_markdown};
     use crate::services::thread_service::open_thread;
-    use crate::services::activity_service::log_export_created;
 
     let thread = open_thread(&state.paths, &id)?;
 

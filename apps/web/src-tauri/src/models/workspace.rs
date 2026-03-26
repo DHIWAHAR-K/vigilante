@@ -2,6 +2,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::models::mcp::McpContextAction;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Workspace {
@@ -28,6 +30,12 @@ pub struct WorkspaceContextItem {
     pub title: String,
     pub path: Option<String>,
     pub subtitle: Option<String>,
+    #[serde(default)]
+    pub value: Option<String>,
+    #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default)]
+    pub mcp_action: Option<McpContextAction>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -37,4 +45,5 @@ pub enum WorkspaceContextKind {
     Directory,
     Thread,
     Url,
+    Mcp,
 }

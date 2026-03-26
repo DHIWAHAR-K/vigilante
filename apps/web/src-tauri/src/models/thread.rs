@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::models::attachment::ComposerAttachment;
 use crate::models::message::{Message, QueryMode, ResearchTrail};
 use crate::models::settings::ProviderConfig;
 
@@ -68,6 +69,8 @@ pub struct DraftThread {
     pub provider: ProviderConfig,
     /// @mentions or attached context items from the composer.
     pub context_items: Vec<DraftContextItem>,
+    #[serde(default)]
+    pub attachments: Vec<ComposerAttachment>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -80,6 +83,7 @@ impl DraftThread {
             input_text: String::new(),
             provider,
             context_items: Vec::new(),
+            attachments: Vec::new(),
             created_at: now,
             updated_at: now,
         }

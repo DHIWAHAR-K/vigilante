@@ -4,6 +4,19 @@ export type QueryMode = 'ask' | 'research' | 'deep_research' | 'rag';
 export type Theme = 'light' | 'dark' | 'system';
 export type FontSize = 'small' | 'medium' | 'large';
 export type SearchProvider = 'brave' | 'serper' | 'searx_ng';
+export type AttachmentKind = 'image' | 'document' | 'code' | 'data' | 'other';
+export type McpTransport = 'stdio' | 'streamable_http';
+export type McpTier = 'tier1' | 'tier2' | 'tier3';
+export type McpContextActionKind =
+  | 'filesystem_search'
+  | 'git_status'
+  | 'git_log'
+  | 'sqlite_schema'
+  | 'postgres_schema'
+  | 'fetch_url'
+  | 'github_search_repositories'
+  | 'github_search_issues'
+  | 'github_search_code';
 export type OllamaStatus =
   | 'unknown'
   | 'running'
@@ -29,10 +42,13 @@ export interface Workspace {
 
 export interface WorkspaceContextItem {
   id: string;
-  kind: 'file' | 'directory' | 'thread' | 'url';
+  kind: 'file' | 'directory' | 'thread' | 'url' | 'mcp';
   title: string;
   path: string | null;
   subtitle: string | null;
+  value?: string | null;
+  source?: string | null;
+  mcpAction?: McpContextAction | null;
 }
 
 export interface Citation {
@@ -81,6 +97,7 @@ export interface ThreadSummary {
 export interface ThreadDetail {
   thread: ThreadSummary;
   messages: Message[];
+  attachments: AttachmentSummary[];
 }
 
 export interface DesktopContextItem {
@@ -89,6 +106,50 @@ export interface DesktopContextItem {
   title: string;
   path?: string | null;
   value?: string | null;
+  source?: string | null;
+  mcpAction?: McpContextAction | null;
+}
+
+export interface AttachmentSummary {
+  id: string;
+  displayName: string;
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: number;
+  kind: AttachmentKind;
+  previewDataUrl?: string | null;
+  originalPath: string;
+  createdAt: string;
+}
+
+export type ComposerAttachment = AttachmentSummary;
+
+export interface DraftContextItem {
+  kind: 'file_ref' | 'url' | 'clipboard_text';
+  label: string;
+  value: string;
+}
+
+export interface DraftThread {
+  id: string;
+  inputText: string;
+  provider: ProviderConfig;
+  contextItems: DraftContextItem[];
+  attachments: ComposerAttachment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PersistedThread {
+  id: string;
+  title: string;
+  messages: Message[];
+  attachmentIds: string[];
+  archived: boolean;
+  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastOpenedAt?: string | null;
 }
 
 export interface QuerySubmission {
@@ -172,12 +233,72 @@ export interface SearchSettings {
   searxngBaseUrl: string | null;
 }
 
+export interface McpEnvironmentVariable {
+  key: string;
+  value: string | null;
+  sourceEnv: string | null;
+}
+
+export interface McpConnectorConfig {
+  id: string;
+  name: string;
+  description: string;
+  tier: McpTier;
+  transport: McpTransport;
+  enabled: boolean;
+  readOnly: boolean;
+  command: string | null;
+  args: string[];
+  url: string | null;
+  env: McpEnvironmentVariable[];
+  allowedRoots: string[];
+  workspaceRootRequired: boolean;
+  startupTimeoutMs: number;
+}
+
+export interface McpSettings {
+  enabledByDefault: boolean;
+  maxContextItems: number;
+  connectors: McpConnectorConfig[];
+}
+
+export interface McpContextAction {
+  connectorId: string;
+  kind: McpContextActionKind;
+}
+
+export interface McpToolInfo {
+  name: string;
+  description?: string | null;
+}
+
+export interface McpResourceInfo {
+  uri: string;
+  name?: string | null;
+  description?: string | null;
+  mimeType?: string | null;
+}
+
+export interface McpConnectorStatus {
+  connectorId: string;
+  name: string;
+  enabled: boolean;
+  transport: McpTransport;
+  available: boolean;
+  serverName?: string | null;
+  serverVersion?: string | null;
+  tools: McpToolInfo[];
+  resources: McpResourceInfo[];
+  error?: string | null;
+}
+
 export interface AppSettings {
   schemaVersion: number;
   appearance: AppearanceSettings;
   defaultProvider: ProviderConfig;
   providerKeys: ProviderKeys;
   search: SearchSettings;
+  mcp: McpSettings;
   hasCompletedOnboarding: boolean;
   createdAt: string;
   updatedAt: string;
@@ -198,6 +319,50 @@ export interface ModelInfo {
   family: string | null;
   parameterSize: string | null;
   quantization: string | null;
+}
+
+export interface RuntimeSnapshot {
+  runtime: OllamaRuntimeStatusInfo;
+  selectedModelId: string | null;
+  installedModels: ModelInfo[];
+}
+
+export interface CatalogModel {
+  id: string;
+  name: string;
+  description: string;
+  family: string | null;
+  sizeBytes: number;
+  parameterSize: string;
+  quantization: string;
+  contextWindow: number;
+  tags: string[];
+  supportsCpu: boolean;
+  supportsAppleSilicon: boolean;
+  supportsNvidia: boolean;
+  minMemoryGb: number | null;
+}
+
+export type ModelInstallStatus =
+  | 'queued'
+  | 'downloading'
+  | 'verifying'
+  | 'complete'
+  | 'failed'
+  | 'cancelled';
+
+export interface ModelInstallJob {
+  id: string;
+  modelId: string;
+  status: ModelInstallStatus;
+  progressPercent: number;
+  downloadedBytes: number | null;
+  totalBytes: number | null;
+  message: string | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
 }
 
 export interface OllamaRuntimeStatusInfo {
@@ -246,6 +411,24 @@ export function pickWorkspaceDirectory(): Promise<string | null> {
 
 export function pickAttachmentFiles(): Promise<string[]> {
   return invokeCommand('pick_attachment_files_cmd');
+}
+
+export function importAttachments(ownerId: string, paths: string[]): Promise<AttachmentSummary[]> {
+  return invokeCommand('import_attachments_cmd', {
+    ownerId,
+    paths,
+  });
+}
+
+export function listAttachments(ownerId: string): Promise<AttachmentSummary[]> {
+  return invokeCommand('list_attachments_cmd', { ownerId });
+}
+
+export function removeAttachment(ownerId: string, attachmentId: string): Promise<void> {
+  return invokeCommand('remove_attachment_cmd', {
+    ownerId,
+    attachmentId,
+  });
 }
 
 export function createWorkspace(name: string, rootPath: string | null): Promise<Workspace> {
@@ -298,20 +481,55 @@ export function exportWorkspaceThread(
 export function submitDesktopQuery(input: {
   workspaceId: string;
   threadId?: string | null;
+  draftId?: string | null;
   query: string;
   mode: QueryMode;
   webSearch: boolean;
   contextItems: DesktopContextItem[];
+  attachments: ComposerAttachment[];
 }): Promise<QuerySubmission> {
   return invokeCommand('submit_desktop_query', {
     request: {
       workspaceId: input.workspaceId,
       threadId: input.threadId ?? null,
+      draftId: input.draftId ?? null,
       query: input.query,
       mode: input.mode,
       webSearch: input.webSearch,
       contextItems: input.contextItems,
+      attachments: input.attachments,
     },
+  });
+}
+
+export function createDraft(provider: ProviderConfig): Promise<DraftThread> {
+  return invokeCommand('create_draft_cmd', { provider });
+}
+
+export function getDraft(id: string): Promise<DraftThread> {
+  return invokeCommand('get_draft_cmd', { id });
+}
+
+export function saveDraft(
+  id: string,
+  inputText: string,
+  contextItems: DraftContextItem[],
+): Promise<DraftThread> {
+  return invokeCommand('save_draft_cmd', {
+    id,
+    inputText,
+    contextItems,
+  });
+}
+
+export function discardDraft(id: string): Promise<void> {
+  return invokeCommand('discard_draft_cmd', { id });
+}
+
+export function promoteDraft(draftId: string, firstMessage: Message): Promise<PersistedThread> {
+  return invokeCommand('promote_draft_cmd', {
+    draftId,
+    firstMessage,
   });
 }
 
@@ -321,6 +539,10 @@ export function getSettings(): Promise<AppSettings> {
 
 export function updateSettings(settings: AppSettings): Promise<AppSettings> {
   return invokeCommand('update_settings', { settings });
+}
+
+export function probeMcpConnector(connectorId: string): Promise<McpConnectorStatus> {
+  return invokeCommand('probe_mcp_connector_cmd', { connectorId });
 }
 
 export function getRuntimeConfig(): Promise<RuntimeSettings> {
@@ -345,6 +567,42 @@ export function ensureRuntimeReady(): Promise<EnsureReadyResult> {
 
 export function listRuntimeModels(): Promise<ModelInfo[]> {
   return invokeCommand('list_models');
+}
+
+export function getRuntimeSnapshot(): Promise<RuntimeSnapshot> {
+  return invokeCommand('get_runtime_snapshot');
+}
+
+export function listModelCatalog(): Promise<CatalogModel[]> {
+  return invokeCommand('list_model_catalog');
+}
+
+export function listInstalledModels(): Promise<ModelInfo[]> {
+  return invokeCommand('list_installed_models_cmd');
+}
+
+export function getSelectedModel(): Promise<string> {
+  return invokeCommand('get_selected_model_cmd');
+}
+
+export function selectModel(modelId: string): Promise<string> {
+  return invokeCommand('select_model_cmd', { modelId });
+}
+
+export function installModel(modelId: string): Promise<ModelInstallJob> {
+  return invokeCommand('install_model_cmd', { modelId });
+}
+
+export function getInstallJob(jobId: string): Promise<ModelInstallJob | null> {
+  return invokeCommand('get_install_job_cmd', { jobId });
+}
+
+export function cancelInstallJob(jobId: string): Promise<ModelInstallJob | null> {
+  return invokeCommand('cancel_install_job_cmd', { jobId });
+}
+
+export function deleteModel(modelId: string): Promise<void> {
+  return invokeCommand('delete_model_cmd', { modelId });
 }
 
 export function getStorageInfo(): Promise<StorageInfo> {

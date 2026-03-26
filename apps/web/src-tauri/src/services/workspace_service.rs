@@ -44,6 +44,9 @@ pub fn lookup_context_items(
                         .path()
                         .parent()
                         .map(|parent| parent.display().to_string()),
+                    value: None,
+                    source: None,
+                    mcp_action: None,
                 });
 
                 if items.len() >= 12 {
@@ -62,6 +65,9 @@ pub fn lookup_context_items(
                     title: thread.title,
                     path: None,
                     subtitle: Some(thread.preview),
+                    value: None,
+                    source: None,
+                    mcp_action: None,
                 });
             }
 

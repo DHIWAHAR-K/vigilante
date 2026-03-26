@@ -1,6 +1,6 @@
 use regex::Regex;
-use reqwest::header::{HeaderMap, HeaderValue};
 use serde_json::Value;
+use url::Url;
 
 use crate::error::VResult;
 use crate::models::desktop::{SearchResult, WebSource};
@@ -23,11 +23,14 @@ pub async fn discover_urls(query: &str, settings: &SearchSettings) -> VResult<Ve
             .collect());
     }
 
-    if let Some(api_key) = settings.brave_api_key.as_deref() {
-        return brave_search(query, api_key).await;
+    if let Some(base_url) = settings.searxng_base_url.as_deref() {
+        let results = searxng_search(query, base_url).await?;
+        if !results.is_empty() {
+            return Ok(results);
+        }
     }
 
-    Ok(Vec::new())
+    duckduckgo_search(query).await
 }
 
 pub async fn fetch_sources(
@@ -50,23 +53,20 @@ fn extract_direct_urls(query: &str) -> Vec<String> {
     let regex = Regex::new(r#"https?://[^\s]+"#).expect("valid URL regex");
     regex
         .find_iter(query)
-        .map(|capture| capture.as_str().trim_end_matches([')', ']', ',', '.']).to_string())
+        .map(|capture| {
+            capture
+                .as_str()
+                .trim_end_matches([')', ']', ',', '.'])
+                .to_string()
+        })
         .collect()
 }
 
-async fn brave_search(query: &str, api_key: &str) -> VResult<Vec<SearchResult>> {
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        "X-Subscription-Token",
-        HeaderValue::from_str(api_key).expect("valid Brave API key header"),
-    );
-    headers.insert("Accept", HeaderValue::from_static("application/json"));
-
+async fn searxng_search(query: &str, base_url: &str) -> VResult<Vec<SearchResult>> {
     let client = reqwest::Client::new();
     let response: Value = client
-        .get("https://api.search.brave.com/res/v1/web/search")
-        .headers(headers)
-        .query(&[("q", query), ("count", "5")])
+        .get(format!("{}/search", base_url.trim_end_matches('/')))
+        .query(&[("q", query), ("format", "json"), ("language", "en-US")])
         .send()
         .await?
         .json()
@@ -101,4 +101,76 @@ async fn brave_search(query: &str, api_key: &str) -> VResult<Vec<SearchResult>> 
     }
 
     Ok(results)
+}
+
+async fn duckduckgo_search(query: &str) -> VResult<Vec<SearchResult>> {
+    let client = reqwest::Client::new();
+    let html = client
+        .get("https://html.duckduckgo.com/html/")
+        .query(&[("q", query)])
+        .send()
+        .await?
+        .text()
+        .await?;
+
+    let result_regex = Regex::new(
+        r#"(?s)<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>.*?(?:<a[^>]*class="result__snippet"[^>]*>(.*?)</a>|<div[^>]*class="result__snippet"[^>]*>(.*?)</div>)"#,
+    )
+    .expect("valid duckduckgo regex");
+    let tag_regex = Regex::new(r"<[^>]+>").expect("valid tag regex");
+
+    let mut results = Vec::new();
+    for (index, capture) in result_regex.captures_iter(&html).enumerate() {
+        let Some(raw_url) = capture.get(1).map(|value| value.as_str()) else {
+            continue;
+        };
+        let Some(url) = extract_duckduckgo_target(raw_url) else {
+            continue;
+        };
+        let title_html = capture
+            .get(2)
+            .map(|value| value.as_str())
+            .unwrap_or_default();
+        let snippet_html = capture
+            .get(3)
+            .or_else(|| capture.get(4))
+            .map(|value| value.as_str())
+            .unwrap_or_default();
+
+        results.push(SearchResult {
+            title: decode_html_entities(&tag_regex.replace_all(title_html, "")),
+            url,
+            snippet: decode_html_entities(&tag_regex.replace_all(snippet_html, "")),
+            rank: (index + 1) as u32,
+        });
+    }
+
+    Ok(results)
+}
+
+fn extract_duckduckgo_target(raw_url: &str) -> Option<String> {
+    let resolved = Url::parse(&format!("https://html.duckduckgo.com{raw_url}"))
+        .or_else(|_| Url::parse(raw_url))
+        .ok()?;
+
+    if let Some(target) = resolved
+        .query_pairs()
+        .find_map(|(key, value)| (key == "uddg").then(|| value.to_string()))
+    {
+        return Some(target);
+    }
+
+    Some(resolved.to_string())
+}
+
+fn decode_html_entities(input: &str) -> String {
+    input
+        .replace("&amp;", "&")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&nbsp;", " ")
+        .trim()
+        .to_string()
 }

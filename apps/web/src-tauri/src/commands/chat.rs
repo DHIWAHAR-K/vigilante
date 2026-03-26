@@ -2,11 +2,14 @@ use tauri::{AppHandle, State};
 use uuid::Uuid;
 
 use crate::error::VResult;
-use crate::models::desktop::{DesktopQueryRequest, QuerySubmission, ThreadDetail, ThreadSummary, WebSource};
+use crate::models::desktop::{
+    DesktopQueryRequest, QuerySubmission, ThreadDetail, ThreadSummary, WebSource,
+};
 use crate::models::settings::AppSettings;
+use crate::services::activity_service::log_export_created;
+use crate::services::attachment_service::list_attachments;
 use crate::services::chat_service::submit_query;
 use crate::services::export_service::{export_thread_json, export_thread_markdown};
-use crate::services::activity_service::log_export_created;
 use crate::state::AppState;
 use crate::storage::json_store::read_json_or_default;
 
@@ -19,11 +22,10 @@ pub fn list_workspace_threads(
 }
 
 #[tauri::command]
-pub fn open_workspace_thread(
-    state: State<'_, AppState>,
-    thread_id: Uuid,
-) -> VResult<ThreadDetail> {
-    state.db.open_thread(thread_id)
+pub fn open_workspace_thread(state: State<'_, AppState>, thread_id: Uuid) -> VResult<ThreadDetail> {
+    let mut detail = state.db.open_thread(thread_id)?;
+    detail.attachments = list_attachments(&state.paths, &thread_id)?;
+    Ok(detail)
 }
 
 #[tauri::command]
@@ -33,7 +35,12 @@ pub fn archive_workspace_thread(state: State<'_, AppState>, thread_id: Uuid) -> 
 
 #[tauri::command]
 pub fn delete_workspace_thread(state: State<'_, AppState>, thread_id: Uuid) -> VResult<()> {
-    state.db.delete_thread(thread_id)
+    state.db.delete_thread(thread_id)?;
+    let attachment_dir = state.paths.attachments_dir().join(thread_id.to_string());
+    if attachment_dir.exists() {
+        std::fs::remove_dir_all(attachment_dir)?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -51,6 +58,11 @@ pub fn export_workspace_thread(
     let thread = state
         .db
         .build_persisted_thread(thread_id, settings.default_provider)?;
+    let mut thread = thread;
+    thread.attachment_ids = list_attachments(&state.paths, &thread_id)?
+        .into_iter()
+        .map(|attachment| attachment.id)
+        .collect();
 
     let path = match format.as_str() {
         "json" => export_thread_json(&state.paths, &thread)?,
