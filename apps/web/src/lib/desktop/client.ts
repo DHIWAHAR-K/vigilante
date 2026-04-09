@@ -325,6 +325,14 @@ export interface RuntimeSnapshot {
   runtime: OllamaRuntimeStatusInfo;
   selectedModelId: string | null;
   installedModels: ModelInfo[];
+  managedRuntime: ManagedRuntimeInfo;
+  activeInstallJobs: ModelInstallJob[];
+}
+
+export interface ManagedRuntimeInfo {
+  managed: boolean;
+  baseUrl: string;
+  modelsDir: string;
 }
 
 export interface CatalogModel {

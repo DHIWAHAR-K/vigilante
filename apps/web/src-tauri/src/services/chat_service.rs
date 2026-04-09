@@ -17,7 +17,7 @@ use crate::services::database_service::AppDatabase;
 use crate::services::draft_service::discard_draft;
 use crate::services::mcp_service::collect_context_blocks;
 use crate::services::model_service::{ensure_model_available, normalize_model_id};
-use crate::services::runtime_service::ensure_runtime_ready;
+use crate::services::runtime_service::{ensure_runtime_ready, normalize_runtime_config};
 use crate::services::web_service::{discover_urls, fetch_sources};
 use crate::storage::json_store::read_json_or_default;
 use crate::storage::paths::StoragePaths;
@@ -35,7 +35,7 @@ pub async fn submit_query(
     request: DesktopQueryRequest,
 ) -> VResult<QuerySubmission> {
     let settings: AppSettings = read_json_or_default(paths.settings().as_path());
-    let runtime_config: RuntimeSettings = read_json_or_default(paths.runtime_config().as_path());
+    let runtime_config = normalize_runtime_config(read_json_or_default(paths.runtime_config().as_path()));
     let workspace = db.get_workspace(request.workspace_id)?;
 
     let mut provider = settings.default_provider.clone();

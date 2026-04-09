@@ -7,18 +7,22 @@ use uuid::Uuid;
 
 use crate::error::{VError, VResult};
 use crate::models::runtime::{
-    CatalogModel, ModelInfo, ModelInstallJob, ModelInstallStatus, OllamaStatus, RuntimeSnapshot,
+    CatalogModel, ManagedRuntimeInfo, ModelInfo, ModelInstallJob, ModelInstallStatus,
+    OllamaStatus, RuntimeSnapshot,
 };
 use crate::models::settings::{AppSettings, RuntimeSettings};
-use crate::services::runtime_service::{cached_runtime_status, ensure_runtime_ready, probe_ollama};
+use crate::services::runtime_service::{
+    cached_runtime_status, ensure_runtime_ready, managed_runtime_base_url,
+    normalize_runtime_config, probe_ollama,
+};
 use crate::state::AppState;
 use crate::storage::json_store::{read_json_or_default, write_json_atomic};
 use crate::storage::paths::StoragePaths;
 
 pub const DEFAULT_MODEL_ID: &str = "llama3.2:3b";
 
-pub async fn get_runtime_snapshot(paths: &StoragePaths) -> VResult<RuntimeSnapshot> {
-    let config: RuntimeSettings = read_json_or_default(paths.runtime_config().as_path());
+pub async fn get_runtime_snapshot(paths: &StoragePaths, db: &crate::services::database_service::AppDatabase) -> VResult<RuntimeSnapshot> {
+    let config = normalize_runtime_config(read_json_or_default(paths.runtime_config().as_path()));
     let runtime = probe_ollama(paths, &config).await?;
     let installed_models = if runtime.models.is_empty()
         && matches!(
@@ -36,14 +40,22 @@ pub async fn get_runtime_snapshot(paths: &StoragePaths) -> VResult<RuntimeSnapsh
     };
 
     Ok(RuntimeSnapshot {
+        active_install_jobs: db.list_active_model_install_jobs()?,
         installed_models,
+        managed_runtime: ManagedRuntimeInfo {
+            managed: true,
+            base_url: managed_runtime_base_url().to_string(),
+            models_dir: paths.models_dir().display().to_string(),
+        },
         runtime,
         selected_model_id: Some(get_selected_model_id(paths)),
     })
 }
 
 pub async fn list_installed_models(paths: &StoragePaths) -> VResult<Vec<ModelInfo>> {
-    Ok(get_runtime_snapshot(paths).await?.installed_models)
+    let config = normalize_runtime_config(read_json_or_default(paths.runtime_config().as_path()));
+    let runtime = probe_ollama(paths, &config).await?;
+    Ok(runtime.models)
 }
 
 pub fn get_selected_model_id(paths: &StoragePaths) -> String {
@@ -60,7 +72,7 @@ pub fn set_selected_model_id(paths: &StoragePaths, model_id: &str) -> VResult<St
     settings.updated_at = Utc::now();
     write_json_atomic(paths.settings().as_path(), &settings)?;
 
-    let mut runtime: RuntimeSettings = read_json_or_default(paths.runtime_config().as_path());
+    let mut runtime = normalize_runtime_config(read_json_or_default(paths.runtime_config().as_path()));
     runtime.default_model = Some(normalized.clone());
     runtime.updated_at = Utc::now();
     write_json_atomic(paths.runtime_config().as_path(), &runtime)?;
@@ -590,7 +602,7 @@ pub fn normalize_model_id(model_id: &str) -> String {
 }
 
 async fn ensure_ollama_available(paths: &StoragePaths) -> VResult<RuntimeSettings> {
-    let config: RuntimeSettings = read_json_or_default(paths.runtime_config().as_path());
+    let config = normalize_runtime_config(read_json_or_default(paths.runtime_config().as_path()));
     let ensured = ensure_runtime_ready(paths, &config).await?;
     if ensured.runtime.status == OllamaStatus::Running
         || ensured.runtime.status == OllamaStatus::Available

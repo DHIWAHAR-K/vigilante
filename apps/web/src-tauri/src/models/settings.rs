@@ -503,7 +503,7 @@ pub struct RuntimeSettings {
 impl Default for RuntimeSettings {
     fn default() -> Self {
         Self {
-            ollama_base_url: "http://127.0.0.1:11434".into(),
+            ollama_base_url: "http://127.0.0.1:11435".into(),
             default_model: Some("llama3.2:3b".into()),
             connection_timeout_ms: 5_000,
             updated_at: Utc::now(),

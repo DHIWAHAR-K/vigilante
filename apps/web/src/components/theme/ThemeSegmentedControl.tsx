@@ -5,6 +5,7 @@ import { useTheme } from 'next-themes';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
+import type { Theme } from '@/lib/desktop/client';
 
 const OPTIONS = [
   { value: 'system', label: 'Auto', icon: Monitor },
@@ -12,45 +13,35 @@ const OPTIONS = [
   { value: 'dark', label: 'Dark', icon: Moon },
 ] as const;
 
-export function ThemeSegmentedControl() {
+interface ThemeSegmentedControlProps {
+  value?: Theme;
+  onChange?: (theme: Theme) => void;
+}
+
+export function ThemeSegmentedControl({ value, onChange }: ThemeSegmentedControlProps) {
   const { theme, setTheme } = useTheme();
-  
-  // Prevent hydration mismatch
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
 
   if (!mounted) {
-    return null;
+    return <div className="h-10 w-full max-w-sm rounded-lg border border-border-subtle bg-bg-elevated p-1" />;
   }
 
-  if (!mounted) {
-    return null;
-  }
-
-  if (!mounted) {
-    return null;
-  }
-
-  if (!mounted) {
-    return null;
-  }
-  
-  if (!mounted) {
-    return (
-      <div className="flex p-1 bg-bg-elevated rounded-lg border border-border-subtle w-full max-w-sm h-10" />
-    );
-  }
+  const activeTheme = value ?? ((theme as Theme | undefined) ?? 'system');
 
   return (
     <div className="flex p-1 bg-bg-elevated rounded-lg border border-border-subtle w-full max-w-sm relative">
       {OPTIONS.map((option) => {
         const Icon = option.icon;
-        const isActive = theme === option.value;
+        const isActive = activeTheme === option.value;
         
         return (
           <button
             key={option.value}
-            onClick={() => setTheme(option.value)}
+            onClick={() => {
+              setTheme(option.value);
+              onChange?.(option.value);
+            }}
             className={cn(
               "flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-body-sm transition-colors relative z-10",
               isActive ? "text-text-primary" : "text-text-muted hover:text-text-secondary"

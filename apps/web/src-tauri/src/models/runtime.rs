@@ -100,6 +100,17 @@ pub struct RuntimeSnapshot {
     pub runtime: OllamaRuntimeStatus,
     pub selected_model_id: Option<String>,
     pub installed_models: Vec<ModelInfo>,
+    pub managed_runtime: ManagedRuntimeInfo,
+    #[serde(default)]
+    pub active_install_jobs: Vec<ModelInstallJob>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ManagedRuntimeInfo {
+    pub managed: bool,
+    pub base_url: String,
+    pub models_dir: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

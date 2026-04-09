@@ -8,7 +8,7 @@ use crate::state::AppState;
 
 #[tauri::command]
 pub async fn get_runtime_snapshot(state: State<'_, AppState>) -> VResult<RuntimeSnapshot> {
-    model_service::get_runtime_snapshot(&state.paths).await
+    model_service::get_runtime_snapshot(&state.paths, &state.db).await
 }
 
 #[tauri::command]

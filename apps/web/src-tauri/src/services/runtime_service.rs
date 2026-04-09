@@ -13,6 +13,28 @@ use crate::models::settings::RuntimeSettings;
 use crate::storage::json_store::{read_json_or_default, write_json_atomic_compact};
 use crate::storage::paths::StoragePaths;
 
+pub const MANAGED_OLLAMA_BASE_URL: &str = "http://127.0.0.1:11435";
+
+pub fn managed_runtime_base_url() -> &'static str {
+    MANAGED_OLLAMA_BASE_URL
+}
+
+pub fn normalize_runtime_config(mut config: RuntimeSettings) -> RuntimeSettings {
+    config.ollama_base_url = managed_runtime_base_url().to_string();
+    config
+}
+
+fn managed_ollama_host_env(config: &RuntimeSettings) -> String {
+    reqwest::Url::parse(&config.ollama_base_url)
+        .ok()
+        .and_then(|url| {
+            let host = url.host_str()?.to_string();
+            let port = url.port_or_known_default()?;
+            Some(format!("{host}:{port}"))
+        })
+        .unwrap_or_else(|| "127.0.0.1:11435".to_string())
+}
+
 // ── Ollama REST types (internal only) ────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
@@ -92,6 +114,7 @@ pub async fn probe_ollama(
     paths: &StoragePaths,
     config: &RuntimeSettings,
 ) -> VResult<OllamaRuntimeStatus> {
+    let config = normalize_runtime_config(config.clone());
     let timeout = Duration::from_millis(config.connection_timeout_ms);
     let client = Client::builder()
         .timeout(timeout)
@@ -164,9 +187,15 @@ pub fn cached_runtime_status(paths: &StoragePaths) -> OllamaRuntimeStatus {
 /// (`~/.ollama/logs/`).  We intentionally do NOT wait for the child: this
 /// function returns as soon as the OS has accepted the spawn request.  Use
 /// `wait_for_ollama_ready` to confirm the server is accepting connections.
-pub async fn start_ollama(binary: &Path) -> VResult<()> {
+pub async fn start_ollama(
+    binary: &Path,
+    paths: &StoragePaths,
+    config: &RuntimeSettings,
+) -> VResult<()> {
     tokio::process::Command::new(binary)
         .arg("serve")
+        .env("OLLAMA_HOST", managed_ollama_host_env(config))
+        .env("OLLAMA_MODELS", paths.models_dir())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         // Detach from our process group so the Ollama server survives if the
@@ -223,8 +252,9 @@ pub async fn ensure_runtime_ready(
     paths: &StoragePaths,
     config: &RuntimeSettings,
 ) -> VResult<EnsureReadyResult> {
+    let config = normalize_runtime_config(config.clone());
     // ── 1. Fast probe ────────────────────────────────────────────────────────
-    let probe = probe_ollama(paths, config).await?;
+    let probe = probe_ollama(paths, &config).await?;
 
     match probe.status {
         // Already operational — nothing to do.
@@ -238,10 +268,10 @@ pub async fn ensure_runtime_ready(
         // Probe already confirmed the binary is missing.
         OllamaStatus::NotInstalled => {
             return Ok(EnsureReadyResult {
-                runtime: probe,
-                start_attempted: false,
-                start_outcome: Some(StartOutcome::NotInstalled),
-            });
+            runtime: probe,
+            start_attempted: false,
+            start_outcome: Some(StartOutcome::NotInstalled),
+        });
         }
         // Stopped / Unknown / Error — attempt recovery below.
         _ => {}
@@ -267,7 +297,7 @@ pub async fn ensure_runtime_ready(
 
     // ── 3. Launch `ollama serve` ──────────────────────────────────────────────
     tracing::info!(binary = %binary.display(), "Starting Ollama");
-    if let Err(e) = start_ollama(&binary).await {
+    if let Err(e) = start_ollama(&binary, paths, &config).await {
         tracing::error!("Failed to start Ollama: {}", e);
         // Return current probe status plus Failed outcome; don't propagate the
         // error — the frontend should show a degraded state, not crash.
@@ -306,7 +336,7 @@ pub async fn ensure_runtime_ready(
     }
 
     // ── 5. Re-probe for version + model list ─────────────────────────────────
-    let final_status = probe_ollama(paths, config).await?;
+    let final_status = probe_ollama(paths, &config).await?;
     tracing::info!(status = ?final_status.status, "Ollama ready");
 
     Ok(EnsureReadyResult {

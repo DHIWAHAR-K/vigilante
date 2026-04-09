@@ -124,6 +124,10 @@ impl StoragePaths {
         self.cache_dir().join("model-inventory.json")
     }
 
+    pub fn models_dir(&self) -> PathBuf {
+        self.base.join("models")
+    }
+
     // ── exports/ ─────────────────────────────────────────────────────────────
 
     pub fn exports_dir(&self) -> PathBuf {
@@ -147,6 +151,7 @@ impl StoragePaths {
         let web_cache_dir = self.web_cache_dir();
         let workers_dir = self.workers_dir();
         let exports_dir = self.exports_dir();
+        let models_dir = self.models_dir();
         let dirs = [
             self.base.as_path(),
             threads_dir.as_path(),
@@ -157,6 +162,7 @@ impl StoragePaths {
             web_cache_dir.as_path(),
             workers_dir.as_path(),
             exports_dir.as_path(),
+            models_dir.as_path(),
         ];
         for dir in dirs {
             std::fs::create_dir_all(dir)?;

@@ -5,7 +5,7 @@ use crate::models::runtime::{EnsureReadyResult, ModelInfo, OllamaRuntimeStatus};
 use crate::services::activity_service::log_runtime_checked;
 use crate::services::runtime_service::{
     cached_runtime_status, ensure_runtime_ready as svc_ensure_ready, find_ollama_binary,
-    probe_ollama, start_ollama,
+    normalize_runtime_config, probe_ollama, start_ollama,
 };
 use crate::state::AppState;
 use crate::storage::json_store::read_json_or_default;
@@ -55,7 +55,7 @@ pub fn list_models(state: State<'_, AppState>) -> Vec<ModelInfo> {
 /// which also starts Ollama automatically.**
 #[tauri::command]
 pub async fn probe_runtime(state: State<'_, AppState>) -> VResult<OllamaRuntimeStatus> {
-    let config = read_json_or_default(state.paths.runtime_config().as_path());
+    let config = normalize_runtime_config(read_json_or_default(state.paths.runtime_config().as_path()));
     let result = probe_ollama(&state.paths, &config).await?;
     let _ = log_runtime_checked(&state.paths, &format!("{:?}", result.status));
     Ok(result)
@@ -83,7 +83,7 @@ pub async fn probe_runtime(state: State<'_, AppState>) -> VResult<OllamaRuntimeS
 ///   `failed`                         → show error detail + "Try Again" button
 #[tauri::command]
 pub async fn ensure_runtime_ready(state: State<'_, AppState>) -> VResult<EnsureReadyResult> {
-    let config = read_json_or_default(state.paths.runtime_config().as_path());
+    let config = normalize_runtime_config(read_json_or_default(state.paths.runtime_config().as_path()));
     let result = svc_ensure_ready(&state.paths, &config).await?;
     let _ = log_runtime_checked(&state.paths, &format!("{:?}", result.runtime.status));
     Ok(result)
@@ -100,11 +100,12 @@ pub async fn ensure_runtime_ready(state: State<'_, AppState>) -> VResult<EnsureR
 /// Exposed for edge-case UI needs (e.g. a settings page "Start Ollama" button).
 /// Normal launch flow should use `ensure_runtime_ready` instead.
 #[tauri::command]
-pub async fn start_ollama_if_installed() -> VResult<bool> {
+pub async fn start_ollama_if_installed(state: State<'_, AppState>) -> VResult<bool> {
     match find_ollama_binary() {
         None => Ok(false),
         Some(binary) => {
-            start_ollama(&binary).await?;
+            let config = normalize_runtime_config(read_json_or_default(state.paths.runtime_config().as_path()));
+            start_ollama(&binary, &state.paths, &config).await?;
             Ok(true)
         }
     }

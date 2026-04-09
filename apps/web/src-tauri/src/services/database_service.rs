@@ -567,6 +567,19 @@ impl AppDatabase {
         })
     }
 
+    pub fn list_active_model_install_jobs(&self) -> VResult<Vec<ModelInstallJob>> {
+        self.with_conn(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT id, model_id, status, progress_percent, downloaded_bytes, total_bytes, message, error, created_at, updated_at, completed_at
+                 FROM model_install_jobs
+                 WHERE status IN ('queued', 'downloading', 'verifying')
+                 ORDER BY updated_at DESC",
+            )?;
+            let rows = stmt.query_map([], model_install_job_from_row)?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()
+        })
+    }
+
     pub fn build_persisted_thread(
         &self,
         thread_id: Uuid,

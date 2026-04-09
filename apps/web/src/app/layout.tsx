@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { DesktopShell } from "@/components/desktop/DesktopShell";
 
 export const metadata: Metadata = {
   title: "Vigilante",
@@ -21,7 +22,7 @@ export default function RootLayout({
           enableSystem={false}
           disableTransitionOnChange
         >
-          {children}
+          <DesktopShell>{children}</DesktopShell>
         </ThemeProvider>
       </body>
     </html>

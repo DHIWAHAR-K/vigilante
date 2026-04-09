@@ -5,6 +5,7 @@ use crate::error::VResult;
 use crate::models::activity::ActivityEvent;
 use crate::models::settings::{AppSettings, RuntimeSettings};
 use crate::services::activity_service::log_event;
+use crate::services::runtime_service::normalize_runtime_config;
 use crate::state::AppState;
 use crate::storage::json_store::{read_json_or_default, write_json_atomic};
 use uuid::Uuid;
@@ -34,7 +35,7 @@ pub fn update_settings(state: State<'_, AppState>, settings: AppSettings) -> VRe
 /// Return the current Ollama runtime configuration.
 #[tauri::command]
 pub fn get_runtime_config(state: State<'_, AppState>) -> RuntimeSettings {
-    read_json_or_default(state.paths.runtime_config().as_path())
+    normalize_runtime_config(read_json_or_default(state.paths.runtime_config().as_path()))
 }
 
 /// Overwrite the runtime configuration.
@@ -43,7 +44,7 @@ pub fn update_runtime_config(
     state: State<'_, AppState>,
     config: RuntimeSettings,
 ) -> VResult<RuntimeSettings> {
-    let mut c = config;
+    let mut c = normalize_runtime_config(config);
     c.updated_at = Utc::now();
     write_json_atomic(state.paths.runtime_config().as_path(), &c)?;
     Ok(c)
