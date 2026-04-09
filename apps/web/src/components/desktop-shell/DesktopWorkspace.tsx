@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { Download, PanelRightOpen, Settings2, Sparkles } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Check, Copy, Download, ExternalLink, Settings2, Sparkles } from 'lucide-react';
 
 import {
   Citation,
@@ -12,30 +12,27 @@ import {
   QueryMode,
   ResearchProgressEvent,
   ThreadDetail,
-  WebSource,
   Workspace,
   WorkspaceContextItem,
 } from '@/lib/desktop/client';
 import { cn } from '@/lib/utils';
 
-import { PendingAttachment } from './types';
 import { DesktopComposer } from './DesktopComposer';
+import { PendingAttachment } from './types';
+import { resolveGreeting } from './utils';
 
 interface DesktopWorkspaceProps {
-  activeCitations: Citation[];
   activeThread: ThreadDetail | null;
   activeWorkspace: Workspace | null;
   attachments: PendingAttachment[];
   contextItems: DesktopContextItem[];
   contextResults: WorkspaceContextItem[];
   exportPath: string | null;
-  inspectorOpen: boolean;
   isSubmitting: boolean;
   mode: QueryMode;
   onExportThread: (format: 'md' | 'json') => void;
   onMentionSelect: (item: WorkspaceContextItem) => void;
   onModeChange: (mode: QueryMode) => void;
-  onOpenInspector: () => void;
   onOpenSettings: () => void;
   onPickAttachments: () => void;
   onQueryChange: (value: string) => void;
@@ -52,69 +49,118 @@ interface DesktopWorkspaceProps {
   selectedModelId: string;
   settingsNotice: string | null;
   streamError: string | null;
-  threadSources: WebSource[];
   webSearch: boolean;
 }
 
-function renderMessage(message: Message) {
-  const isAssistant = message.role === 'assistant';
+function AssistantActions({ content }: { content: string }) {
+  const [copied, setCopied] = useState(false);
 
   return (
-    <motion.article
-      key={message.id}
-      layout
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={cn(
-        'py-2',
-        isAssistant
-          ? 'px-0'
-          : 'ml-auto max-w-[85%] rounded-xl border border-border-subtle bg-bg-elevated px-4 py-3',
-      )}
-    >
-      <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] text-text-muted">
-        <span>{isAssistant ? 'Assistant' : 'You'}</span>
-        {isAssistant && !message.isComplete && <span className="text-accent">Streaming</span>}
-      </div>
+    <div className="mt-3 flex items-center gap-0.5">
+      <button
+        onClick={() => {
+          void navigator.clipboard.writeText(content);
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1800);
+        }}
+        className="rounded-md p-1.5 text-text-muted transition hover:bg-bg-elevated hover:text-text-primary"
+        title="Copy"
+      >
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+      </button>
+    </div>
+  );
+}
 
-      <div className="whitespace-pre-wrap text-[14px] leading-7 text-text-primary">
-        {message.content || (isAssistant ? 'Thinking…' : '')}
-      </div>
+function MessageCard({ message }: { message: Message }) {
+  const isUser = message.role === 'user';
 
-      {message.citations.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {message.citations.map((citation) => (
-            <a
-              key={citation.id}
-              href={citation.url}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-md border border-border-subtle bg-bg-surface px-2.5 py-1 text-[11px] text-text-secondary transition hover:text-text-primary"
-            >
-              [{citation.index}] {citation.title}
-            </a>
-          ))}
+  return (
+    <div className={cn('flex w-full', isUser ? 'justify-end' : 'justify-start')}>
+      <div
+        className={cn(
+          isUser
+            ? 'max-w-[78%] rounded-[1.6rem] rounded-br-lg bg-bg-elevated px-4 py-2.5 text-text-primary'
+            : 'max-w-[85%] py-1 text-text-primary',
+        )}
+      >
+        <div className="whitespace-pre-wrap text-[15px] leading-relaxed">
+          {message.content || (!isUser ? 'Thinking…' : '')}
+          {!message.isComplete && !isUser && <span className="ml-2 streaming-cursor align-middle" />}
         </div>
+
+        {!isUser && message.citations.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {message.citations.map((citation) => (
+              <a
+                key={citation.id}
+                href={citation.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle px-3 py-1.5 text-[11px] text-text-secondary transition hover:bg-bg-elevated hover:text-text-primary"
+              >
+                <span>[{citation.index}]</span>
+                <span className="max-w-[220px] truncate">{citation.title}</span>
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            ))}
+          </div>
+        )}
+
+        {!isUser && <AssistantActions content={message.content} />}
+      </div>
+    </div>
+  );
+}
+
+function StatusNotice({
+  exportPath,
+  researchProgress,
+  settingsNotice,
+  streamError,
+}: {
+  exportPath: string | null;
+  researchProgress: ResearchProgressEvent | null;
+  settingsNotice: string | null;
+  streamError: string | null;
+}) {
+  const tone = streamError
+    ? 'border-destructive/20 bg-destructive/10 text-text-primary'
+    : 'border-border-subtle bg-bg-surface text-text-secondary';
+
+  if (!researchProgress && !streamError && !settingsNotice && !exportPath) {
+    return null;
+  }
+
+  return (
+    <div className={cn('rounded-2xl border px-4 py-3 text-sm', tone)}>
+      {researchProgress ? (
+        <div>
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-text-muted">
+            <Sparkles className="h-3.5 w-3.5" />
+            {researchProgress.phase.replaceAll('_', ' ')}
+          </div>
+          <p className="mt-2">{researchProgress.message}</p>
+        </div>
+      ) : (
+        <p>{streamError ?? settingsNotice ?? exportPath}</p>
       )}
-    </motion.article>
+    </div>
   );
 }
 
 export function DesktopWorkspace({
-  activeCitations,
   activeThread,
   activeWorkspace,
   attachments,
   contextItems,
   contextResults,
   exportPath,
-  inspectorOpen,
   isSubmitting,
   mode,
   onExportThread,
   onMentionSelect,
   onModeChange,
-  onOpenInspector,
   onOpenSettings,
   onPickAttachments,
   onQueryChange,
@@ -131,191 +177,117 @@ export function DesktopWorkspace({
   selectedModelId,
   settingsNotice,
   streamError,
-  threadSources,
   webSearch,
 }: DesktopWorkspaceProps) {
   const hasMessages = (activeThread?.messages.length ?? 0) > 0;
-  const inspectorAvailable =
-    Boolean(activeThread) || activeCitations.length > 0 || threadSources.length > 0;
+  const workspaceName = activeWorkspace?.name ?? 'Local workspace';
+  const greeting = useMemo(() => resolveGreeting(), []);
 
   return (
     <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-bg-base">
-      <div className="relative flex items-center justify-between border-b border-border-subtle px-8 py-4">
-        <div className="min-w-0">
-          <p className="text-[10px] uppercase tracking-[0.14em] text-text-muted">Workspace</p>
-          <p className="mt-1 truncate text-[13px] text-text-primary">
-            {activeWorkspace?.name ?? 'Local workspace'}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onOpenInspector}
-            disabled={!inspectorAvailable}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-subtle bg-bg-elevated text-text-secondary transition hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-            title="Sources"
-          >
-            <PanelRightOpen className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={onOpenSettings}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-subtle bg-bg-elevated text-text-secondary transition hover:text-text-primary"
-            title="Settings"
-          >
-            <Settings2 className="h-3.5 w-3.5" />
-          </button>
+      <header className="flex h-11 shrink-0 items-center justify-end gap-2 px-4">
+        {hasMessages && (
           <button
             onClick={() => onExportThread('md')}
-            disabled={!activeThread}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-subtle bg-bg-elevated text-text-secondary transition hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-            title="Export"
+            className="rounded-lg px-2.5 py-1 text-[13px] text-text-muted transition hover:bg-bg-elevated hover:text-text-primary"
           >
-            <Download className="h-3.5 w-3.5" />
+            <span className="inline-flex items-center gap-1.5">
+              <Download className="h-3.5 w-3.5" />
+              Export
+            </span>
           </button>
-        </div>
-      </div>
+        )}
+        <button
+          onClick={onOpenSettings}
+          className="rounded-lg p-1.5 text-text-muted transition hover:bg-bg-elevated hover:text-text-primary"
+          title="Settings"
+        >
+          <Settings2 className="h-4 w-4" />
+        </button>
+      </header>
 
-      <AnimatePresence mode="wait">
-        {!hasMessages ? (
-          <motion.section
-            key="desktop-home"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -14 }}
-            transition={{ duration: 0.24, ease: 'easeOut' }}
-            className="relative flex flex-1 items-center justify-center overflow-y-auto px-6 pb-24 pt-10"
-          >
-            <div className="w-full max-w-[860px]">
-              <h1 className="mb-2 text-center text-[28px] font-medium tracking-[-0.02em] text-text-primary">
-                Start a conversation
-              </h1>
-              <p className="mx-auto mb-7 max-w-[620px] text-center text-[14px] text-text-secondary">
-                Ask a question, attach files, or mention workspace context.
-              </p>
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {hasMessages && (
+          <div className="desktop-scrollbar flex-1 overflow-y-auto">
+            <div className="mx-auto max-w-3xl px-4 pb-56 pt-6">
+              <div className="space-y-4">
+                <StatusNotice
+                  exportPath={exportPath}
+                  researchProgress={researchProgress}
+                  settingsNotice={settingsNotice}
+                  streamError={streamError}
+                />
 
-              <DesktopComposer
-                attachments={attachments}
-                contextItems={contextItems}
-                contextResults={contextResults}
-                isSubmitting={isSubmitting}
-                mode={mode}
-                onDropFiles={onDropFiles}
-                onMentionSelect={onMentionSelect}
-                onModeChange={onModeChange}
-                onPickAttachments={onPickAttachments}
-                onQueryChange={onQueryChange}
-                onRemoveAttachment={onRemoveAttachment}
-                onRemoveContextItem={onRemoveContextItem}
-                onSelectModel={onSelectModel}
-                onSubmit={onSubmit}
-                onToggleWebSearch={onToggleWebSearch}
-                onUploadImages={onUploadImages}
-                query={query}
-                runtimeModels={runtimeModels}
-                selectedModelId={selectedModelId}
-                webSearch={webSearch}
-              />
-
-              <AnimatePresence initial={false}>
-                {(streamError || settingsNotice) && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
-                    className="mx-auto mt-4 max-w-[720px] rounded-md border border-border-subtle bg-bg-elevated px-3 py-2 text-center text-[12px] text-text-secondary"
-                  >
-                    {streamError ?? settingsNotice}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.section>
-        ) : (
-          <motion.section
-            key="desktop-thread"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -14 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
-            className="relative flex min-h-0 flex-1 flex-col"
-          >
-            <div className="desktop-scrollbar min-h-0 flex-1 overflow-y-auto px-6 pb-8 pt-6">
-              <div className="mx-auto w-full max-w-[860px]">
-                <div className="mb-5">
-                  <p className="text-[10px] uppercase tracking-[0.14em] text-text-muted">Thread</p>
-                  <h1 className="mt-2 text-[20px] font-medium tracking-[-0.02em] text-text-primary">
-                    {activeThread?.thread.title ?? 'Untitled thread'}
-                  </h1>
-                </div>
-
-                <AnimatePresence initial={false}>
-                  {researchProgress && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      className="mb-4 rounded-md border border-accent/20 bg-accent/10 px-3 py-2"
-                    >
-                      <div className="mb-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-accent">
-                        <Sparkles className="h-3.5 w-3.5" />
-                        {researchProgress.phase.replaceAll('_', ' ')}
-                      </div>
-                      <p className="text-[13px] text-text-primary">{researchProgress.message}</p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <div className="space-y-3">
-                  {activeThread?.messages.map((message) => renderMessage(message))}
-                </div>
-
-                <AnimatePresence initial={false}>
-                  {(streamError || settingsNotice || exportPath) && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      className="mt-5 rounded-md border border-border-subtle bg-bg-elevated px-3 py-2 text-[12px] text-text-secondary"
-                    >
-                      {streamError ?? settingsNotice ?? exportPath}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                {activeThread?.messages.map((message) => (
+                  <MessageCard key={message.id} message={message} />
+                ))}
               </div>
             </div>
-
-            <div className="border-t border-border-subtle px-0 py-5">
-              <DesktopComposer
-                attachments={attachments}
-                compact
-                contextItems={contextItems}
-                contextResults={contextResults}
-                isSubmitting={isSubmitting}
-                mode={mode}
-                onDropFiles={onDropFiles}
-                onMentionSelect={onMentionSelect}
-                onModeChange={onModeChange}
-                onPickAttachments={onPickAttachments}
-                onQueryChange={onQueryChange}
-                onRemoveAttachment={onRemoveAttachment}
-                onRemoveContextItem={onRemoveContextItem}
-                onSelectModel={onSelectModel}
-                onSubmit={onSubmit}
-                onToggleWebSearch={onToggleWebSearch}
-                onUploadImages={onUploadImages}
-                query={query}
-                runtimeModels={runtimeModels}
-                selectedModelId={selectedModelId}
-                webSearch={webSearch}
-              />
-            </div>
-          </motion.section>
+          </div>
         )}
-      </AnimatePresence>
 
-      {!inspectorOpen && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-bg-base to-transparent" />
-      )}
+        {!hasMessages && <div className="flex-1" />}
+
+        <motion.div
+          layout
+          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          className={cn('mx-auto w-full max-w-2xl px-4', hasMessages ? 'pb-4' : 'pb-8')}
+        >
+          <div className="flex w-full flex-col items-center">
+            {!hasMessages && (
+              <>
+                <div className="mb-6">
+                  <Sparkles className="h-9 w-9 text-text-muted/70" strokeWidth={1.5} />
+                </div>
+
+                <h1 className="mb-2 text-center text-[28px] font-medium tracking-[-0.01em] text-text-primary">
+                  {greeting}
+                </h1>
+                <p className="mb-8 text-center text-[14px] text-text-muted">
+                  Active workspace: {workspaceName}
+                </p>
+              </>
+            )}
+
+            <DesktopComposer
+              attachments={attachments}
+              compact={hasMessages}
+              contextItems={contextItems}
+              contextResults={contextResults}
+              isSubmitting={isSubmitting}
+              mode={mode}
+              onDropFiles={onDropFiles}
+              onMentionSelect={onMentionSelect}
+              onModeChange={onModeChange}
+              onPickAttachments={onPickAttachments}
+              onQueryChange={onQueryChange}
+              onRemoveAttachment={onRemoveAttachment}
+              onRemoveContextItem={onRemoveContextItem}
+              onSelectModel={onSelectModel}
+              onSubmit={onSubmit}
+              onToggleWebSearch={onToggleWebSearch}
+              onUploadImages={onUploadImages}
+              query={query}
+              runtimeModels={runtimeModels}
+              selectedModelId={selectedModelId}
+              webSearch={webSearch}
+            />
+
+            {!hasMessages && (
+              <div className="mt-4 w-full">
+                <StatusNotice
+                  exportPath={exportPath}
+                  researchProgress={researchProgress}
+                  settingsNotice={settingsNotice}
+                  streamError={streamError}
+                />
+              </div>
+            )}
+          </div>
+        </motion.div>
+
+        {!hasMessages && <div className="flex-1" />}
+      </div>
     </main>
   );
 }
