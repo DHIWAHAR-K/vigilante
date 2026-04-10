@@ -10,9 +10,13 @@
     "dev:orchestrator": "pnpm --filter @vigilante/orchestrator dev",
     "build": "pnpm --filter web tauri:build",
     "typecheck": "turbo typecheck",
-    "lint": "pnpm run typecheck"
+    "lint": "pnpm run typecheck",
+    "prepare": "husky install"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0",
+    "husky": "^9.1.7",
     "turbo": "^2.3.3",
     "typescript": "^5.8.3"
   },

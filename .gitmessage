@@ -1,0 +1,21 @@
+# <type>(<scope>): <subject>
+# |<----  Limit subject to 50 characters  ---->|
+#
+# Explain what and why, not how.
+# Wrap at 72 characters for better formatting.
+#
+# Type: feat, fix, refactor, perf, docs, style, test, chore, ci, build
+# Scope: web, orchestrator, db, providers, cli, tauri, sidebar, etc.
+#
+# Examples:
+# feat(web): add file attachment support to chat
+# fix(runtime): prevent model timeout on large downloads
+# refactor(sidebar): extract conversation item to component
+# docs(orchestrator): add API endpoint documentation
+# chore(deps): upgrade react to 19.2.0
+#
+# Blank line after subject, then detailed explanation if needed.
+# Use bullet points for multiple related changes.
+# Reference issues: Fixes #123, Closes #456
+# Include co-authors: Co-authored-by: Name <email@example.com>
+

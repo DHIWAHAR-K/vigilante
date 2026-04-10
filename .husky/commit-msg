@@ -1,0 +1,8 @@
+#!/bin/sh
+# commitlint hook - validates commit message format
+# Install: pnpm install -D husky @commitlint/cli @commitlint/config-conventional
+# Then run: pnpm husky install
+
+. "$(dirname "$0")/_/husky.sh"
+
+pnpm commitlint --edit "${1}"
