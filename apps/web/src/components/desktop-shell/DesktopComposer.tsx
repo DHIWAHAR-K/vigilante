@@ -19,6 +19,7 @@ import {
   QueryMode,
   WorkspaceContextItem,
 } from '@/lib/desktop/client';
+import { isComposerSubmitShortcut } from '@/lib/keyboard/composerSubmitShortcut';
 import { cn } from '@/lib/utils';
 
 import { PendingAttachment } from './types';
@@ -39,7 +40,6 @@ interface DesktopComposerProps {
   onSelectModel: (modelId: string) => void;
   onSubmit: () => void;
   onToggleWebSearch: () => void;
-  onUploadImages: () => void;
   onDropFiles: (files: FileList) => void;
   query: string;
   runtimeModels: ModelInfo[];
@@ -63,7 +63,6 @@ export function DesktopComposer({
   onSelectModel,
   onSubmit,
   onToggleWebSearch,
-  onUploadImages,
   onDropFiles,
   query,
   runtimeModels,
@@ -168,7 +167,7 @@ export function DesktopComposer({
               resizeTextarea(event.target);
             }}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
+              if (isComposerSubmitShortcut(event)) {
                 event.preventDefault();
                 onSubmit();
               }
@@ -188,18 +187,9 @@ export function DesktopComposer({
               onClick={onPickAttachments}
               className="rounded-lg p-1.5 text-text-muted transition hover:bg-bg-elevated hover:text-text-primary"
               type="button"
-              title="Attach files"
+              title="Attach files or images"
             >
               <Paperclip className="h-4.5 w-4.5" />
-            </button>
-
-            <button
-              onClick={onUploadImages}
-              className="rounded-lg p-1.5 text-text-muted transition hover:bg-bg-elevated hover:text-text-primary"
-              type="button"
-              title="Attach image"
-            >
-              <ImagePlus className="h-4.5 w-4.5" />
             </button>
 
             <button
@@ -250,7 +240,7 @@ export function DesktopComposer({
             disabled={(!query.trim() && attachments.length === 0 && extraContextItems.length === 0) || isSubmitting}
             className="rounded-lg bg-text-primary p-1.5 text-bg-base transition hover:opacity-85 disabled:cursor-not-allowed disabled:bg-bg-elevated disabled:text-text-muted"
             type="button"
-            title="Send"
+            title="Send (⌘↵)"
           >
             {isSubmitting ? <Sparkles className="h-4 w-4 animate-pulse" /> : <ArrowUp className="h-4 w-4" />}
           </button>

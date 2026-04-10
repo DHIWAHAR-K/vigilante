@@ -2,7 +2,6 @@
 
 import React, { useMemo, useRef, useState } from 'react';
 import {
-  FolderPlus,
   PanelLeft,
   PanelLeftClose,
   Plus,
@@ -20,16 +19,13 @@ interface DesktopSidebarProps {
   activeThreadId: string | null;
   activeView: 'chat' | 'settings';
   activeWorkspace: Workspace | null;
-  onCreateWorkspace: () => void;
   onDeleteThread: (threadId: string) => void;
   onNewThread: () => void;
   onOpenSettings: () => void;
   onSearchThreadsChange: (value: string) => void;
   onSelectThread: (threadId: string) => void;
-  onSelectWorkspace: (workspace: Workspace) => void;
   searchThreads: string;
   threads: ThreadSummary[];
-  workspaces: Workspace[];
 }
 
 const topActions = [
@@ -41,16 +37,13 @@ export function DesktopSidebar({
   activeThreadId,
   activeView,
   activeWorkspace,
-  onCreateWorkspace,
   onDeleteThread,
   onNewThread,
   onOpenSettings,
   onSearchThreadsChange,
   onSelectThread,
-  onSelectWorkspace,
   searchThreads,
   threads,
-  workspaces,
 }: DesktopSidebarProps) {
   const [open, setOpen] = useState(true);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -134,36 +127,6 @@ export function DesktopSidebar({
 
         {open ? (
           <>
-            <div className="px-3 pb-1">
-              <div className="flex items-center justify-between px-1 py-2">
-                <p className="text-[12px] font-medium uppercase tracking-[0.14em] text-text-muted">Workspace</p>
-                <button
-                  onClick={onCreateWorkspace}
-                  className="rounded-md p-1 text-text-muted transition hover:bg-bg-surface hover:text-text-primary"
-                  title="Add workspace"
-                >
-                  <FolderPlus className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="space-y-1">
-                {workspaces.map((workspace) => (
-                  <button
-                    key={workspace.id}
-                    onClick={() => onSelectWorkspace(workspace)}
-                    className={cn(
-                      'flex w-full items-center rounded-lg px-3 py-2 text-left text-[13px] transition',
-                      activeWorkspace?.id === workspace.id
-                        ? 'bg-bg-surface text-text-primary'
-                        : 'text-text-secondary hover:bg-bg-surface hover:text-text-primary',
-                    )}
-                  >
-                    <span className="truncate">{workspace.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div className="mt-3 flex-1 overflow-y-auto px-2 pb-3">
               <p className="px-3 py-2 text-[12px] font-medium uppercase tracking-[0.14em] text-text-muted">
                 Recents
@@ -243,13 +206,6 @@ export function DesktopSidebar({
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2 pb-3">
-            <button
-              onClick={onCreateWorkspace}
-              className="rounded-lg p-2 text-text-muted transition hover:bg-bg-surface hover:text-text-primary"
-              title="Add workspace"
-            >
-              <FolderPlus className="h-5 w-5" />
-            </button>
             <button
               onClick={onOpenSettings}
               className={cn(

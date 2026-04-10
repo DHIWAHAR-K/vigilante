@@ -2,7 +2,8 @@
 
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Copy, Download, ExternalLink, Settings2, Sparkles } from 'lucide-react';
+import { Check, Copy, Download, ExternalLink, Minus, Maximize2, Settings2, Sparkles, X } from 'lucide-react';
+import { minimizeWindow, toggleMaximizeWindow, closeWindow } from '@/lib/desktop/client';
 
 import {
   Citation,
@@ -41,7 +42,6 @@ interface DesktopWorkspaceProps {
   onSelectModel: (modelId: string) => void;
   onSubmit: () => void;
   onToggleWebSearch: () => void;
-  onUploadImages: () => void;
   onDropFiles: (files: FileList) => void;
   query: string;
   researchProgress: ResearchProgressEvent | null;
@@ -169,7 +169,6 @@ export function DesktopWorkspace({
   onSelectModel,
   onSubmit,
   onToggleWebSearch,
-  onUploadImages,
   onDropFiles,
   query,
   researchProgress,
@@ -184,8 +183,14 @@ export function DesktopWorkspace({
   const greeting = useMemo(() => resolveGreeting(), []);
 
   return (
-    <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-bg-base">
-      <header className="flex h-11 shrink-0 items-center justify-end gap-2 px-4">
+    <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-bg-base">
+      <header
+        data-tauri-drag-region
+        className="flex h-11 shrink-0 items-center gap-2 pl-20 pr-4"
+      >
+        {/* drag region fills gap */}
+        <div data-tauri-drag-region className="flex-1" />
+
         {hasMessages && (
           <button
             onClick={() => onExportThread('md')}
@@ -204,6 +209,30 @@ export function DesktopWorkspace({
         >
           <Settings2 className="h-4 w-4" />
         </button>
+
+        <div className="ml-1 flex items-center gap-0.5">
+          <button
+            onClick={() => void minimizeWindow()}
+            className="rounded p-1.5 text-text-muted transition hover:bg-bg-elevated hover:text-text-primary"
+            title="Minimize"
+          >
+            <Minus className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => void toggleMaximizeWindow()}
+            className="rounded p-1.5 text-text-muted transition hover:bg-bg-elevated hover:text-text-primary"
+            title="Maximize / Restore"
+          >
+            <Maximize2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => void closeWindow()}
+            className="rounded p-1.5 text-text-muted transition hover:bg-bg-elevated hover:text-destructive"
+            title="Close"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -231,7 +260,7 @@ export function DesktopWorkspace({
         <motion.div
           layout
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          className={cn('mx-auto w-full max-w-2xl px-4', hasMessages ? 'pb-4' : 'pb-8')}
+          className={cn('mx-auto w-full max-w-2xl px-4 sm:px-6', hasMessages ? 'pb-4' : 'pb-8')}
         >
           <div className="flex w-full flex-col items-center">
             {!hasMessages && (
@@ -266,7 +295,6 @@ export function DesktopWorkspace({
               onSelectModel={onSelectModel}
               onSubmit={onSubmit}
               onToggleWebSearch={onToggleWebSearch}
-              onUploadImages={onUploadImages}
               query={query}
               runtimeModels={runtimeModels}
               selectedModelId={selectedModelId}
