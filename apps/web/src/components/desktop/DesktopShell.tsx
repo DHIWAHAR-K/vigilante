@@ -7,6 +7,7 @@ import React, {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { Monitor } from 'lucide-react';
@@ -21,16 +22,15 @@ import {
   Citation,
   DesktopContextItem,
   EnsureReadyResult,
-  ManagedRuntimeInfo,
   Message,
   ModelInfo,
   ModelInstallJob,
   OllamaRuntimeStatusInfo,
+  QuerySubmission,
   QueryFinished,
   QueryMode,
   ResearchProgressEvent,
   RuntimeSnapshot,
-  StorageInfo,
   Theme,
   ThreadDetail,
   ThreadSummary,
@@ -38,7 +38,6 @@ import {
   Workspace,
   WorkspaceContextItem,
   cancelInstallJob,
-  createWorkspace,
   deleteThread,
   ensureRuntimeReady,
   exportWorkspaceThread,
@@ -46,20 +45,16 @@ import {
   getInstallJob,
   getRuntimeSnapshot,
   getSettings,
-  getStorageInfo,
   installModel,
   isDesktopApp,
   listModelCatalog,
   listThreadSources,
   listThreads,
-  listWorkspaces,
   listenEvent,
   lookupContextItems,
   openThread,
   pickAttachmentFiles,
-  pickWorkspaceDirectory,
   selectModel,
-  setActiveWorkspace,
   submitDesktopQuery,
   updateSettings,
 } from '@/lib/desktop/client';
@@ -74,7 +69,6 @@ import {
   createAttachment,
   deriveTitle,
   extractDroppedPaths,
-  inferWorkspaceName,
 } from '@/components/desktop-shell/utils';
 
 interface DesktopShellProps {
@@ -82,6 +76,17 @@ interface DesktopShellProps {
 }
 
 const ACTIVE_INSTALL_STATUSES = new Set(['queued', 'downloading', 'verifying']);
+type DesktopEventStatus = 'idle' | 'registering' | 'ready' | 'failed';
+type SubmissionRecoveryMode = 'events' | 'polling';
+
+interface ActiveSubmissionState {
+  startedAt: number;
+  workspaceId: string;
+  threadId: string | null;
+  submittedQuery: string;
+  pendingTitle: string;
+  recoveryMode: SubmissionRecoveryMode;
+}
 
 export function DesktopShell({ children }: DesktopShellProps) {
   const pathname = usePathname();
@@ -89,7 +94,6 @@ export function DesktopShell({ children }: DesktopShellProps) {
   const { setTheme } = useTheme();
 
   const [isDesktop, setIsDesktop] = useState(false);
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWorkspace, setActiveWorkspaceState] = useState<Workspace | null>(null);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [activeThread, setActiveThread] = useState<ThreadDetail | null>(null);
@@ -112,11 +116,45 @@ export function DesktopShell({ children }: DesktopShellProps) {
   const [exportPath, setExportPath] = useState<string | null>(null);
   const [researchProgress, setResearchProgress] = useState<ResearchProgressEvent | null>(null);
   const [modelCatalog, setModelCatalog] = useState<CatalogModel[]>([]);
-  const [managedRuntime, setManagedRuntime] = useState<ManagedRuntimeInfo | null>(null);
-  const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
   const [activeInstallJobs, setActiveInstallJobs] = useState<ModelInstallJob[]>([]);
+  const [desktopEventStatus, setDesktopEventStatus] = useState<DesktopEventStatus>('idle');
+  const [activeSubmission, setActiveSubmission] = useState<ActiveSubmissionState | null>(null);
+
+  const activeWorkspaceRef = useRef<Workspace | null>(null);
+  const activeThreadRef = useRef<ThreadDetail | null>(null);
+  const modeRef = useRef<QueryMode>(mode);
+  const noticeTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    activeWorkspaceRef.current = activeWorkspace;
+  }, [activeWorkspace]);
+
+  useEffect(() => {
+    activeThreadRef.current = activeThread;
+  }, [activeThread]);
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   const activeView = pathname.startsWith('/settings') ? 'settings' : 'chat';
+
+  useEffect(() => {
+    setSettingsNotice(null);
+    if (noticeTimerRef.current !== null) {
+      window.clearTimeout(noticeTimerRef.current);
+      noticeTimerRef.current = null;
+    }
+  }, [activeView]);
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimerRef.current !== null) {
+        window.clearTimeout(noticeTimerRef.current);
+      }
+    };
+  }, []);
+
   const deferredSearchThreads = useDeferredValue(searchThreads);
 
   const visibleThreads = useMemo(() => {
@@ -137,13 +175,11 @@ export function DesktopShell({ children }: DesktopShellProps) {
     settingsDraft?.defaultProvider.modelId ?? runtimeStatus?.models[0]?.id ?? 'llama3.2:3b';
 
   const applyRuntimeSnapshot = useCallback(
-    (snapshot: RuntimeSnapshot, nextCatalog?: CatalogModel[], nextStorageInfo?: StorageInfo) => {
+    (snapshot: RuntimeSnapshot, nextCatalog?: CatalogModel[]) => {
       setRuntimeStatus(snapshot.runtime);
       setRuntimeModels(snapshot.installedModels.length > 0 ? snapshot.installedModels : snapshot.runtime.models);
-      setManagedRuntime(snapshot.managedRuntime);
       setActiveInstallJobs(snapshot.activeInstallJobs);
       if (nextCatalog) setModelCatalog(nextCatalog);
-      if (nextStorageInfo) setStorageInfo(nextStorageInfo);
       setSettingsDraft((current) =>
         current
           ? {
@@ -161,12 +197,8 @@ export function DesktopShell({ children }: DesktopShellProps) {
   );
 
   const refreshRuntimeState = useCallback(async () => {
-    const [snapshot, catalog, nextStorageInfo] = await Promise.all([
-      getRuntimeSnapshot(),
-      listModelCatalog(),
-      getStorageInfo(),
-    ]);
-    applyRuntimeSnapshot(snapshot, catalog, nextStorageInfo);
+    const [snapshot, catalog] = await Promise.all([getRuntimeSnapshot(), listModelCatalog()]);
+    applyRuntimeSnapshot(snapshot, catalog);
     return snapshot;
   }, [applyRuntimeSnapshot]);
 
@@ -185,12 +217,13 @@ export function DesktopShell({ children }: DesktopShellProps) {
       const nextThreads = await listThreads(workspaceId);
       setThreads(nextThreads);
 
-      const currentThreadStillVisible = activeThread
-        ? nextThreads.some((thread) => thread.id === activeThread.thread.id)
+      const currentThread = activeThreadRef.current;
+      const currentThreadStillVisible = currentThread
+        ? nextThreads.some((thread) => thread.id === currentThread.thread.id)
         : false;
       const nextActiveId =
         preferredThreadId ??
-        (currentThreadStillVisible ? activeThread?.thread.id : undefined) ??
+        (currentThreadStillVisible ? currentThread?.thread.id : undefined) ??
         nextThreads[0]?.id;
 
       if (nextActiveId) {
@@ -200,23 +233,19 @@ export function DesktopShell({ children }: DesktopShellProps) {
         setThreadSources([]);
       }
     },
-    [activeThread, syncThread],
+    [syncThread],
   );
 
   const hydrateDesktop = useCallback(async () => {
     try {
-      const [workspace, workspaceList, nextSettings, snapshot, catalog, nextStorageInfo] =
-        await Promise.all([
-          getActiveWorkspace(),
-          listWorkspaces(),
-          getSettings(),
-          getRuntimeSnapshot(),
-          listModelCatalog(),
-          getStorageInfo(),
-        ]);
+      const [workspace, nextSettings, snapshot, catalog] = await Promise.all([
+        getActiveWorkspace(),
+        getSettings(),
+        getRuntimeSnapshot(),
+        listModelCatalog(),
+      ]);
 
       setActiveWorkspaceState(workspace);
-      setWorkspaces(workspaceList);
       setSettingsDraft({
         ...nextSettings,
         defaultProvider: {
@@ -227,7 +256,7 @@ export function DesktopShell({ children }: DesktopShellProps) {
       });
       setWebSearch(nextSettings.search.enabledByDefault);
       setTheme(nextSettings.appearance.theme);
-      applyRuntimeSnapshot(snapshot, catalog, nextStorageInfo);
+      applyRuntimeSnapshot(snapshot, catalog);
 
       await reloadThreads(workspace.id);
     } catch (error) {
@@ -249,16 +278,33 @@ export function DesktopShell({ children }: DesktopShellProps) {
 
     let disposed = false;
     const unsubs: Array<() => void> = [];
+    setDesktopEventStatus('registering');
 
-    void (async () => {
+    const finishActiveSubmission = (threadId: string) => {
+      const workspace = activeWorkspaceRef.current;
+      void syncThread(threadId);
+      if (workspace) {
+        void reloadThreads(workspace.id, threadId);
+      }
+      void refreshRuntimeState();
+      setIsSubmitting(false);
+      setResearchProgress(null);
+      setActiveSubmission(null);
+    };
+
+    const registerDesktopEvents = async () => {
       unsubs.push(
-        await listenEvent<{ threadId: string }>('vigilante://assistant-started', (payload) => {
+        await listenEvent<QuerySubmission>('vigilante://assistant-started', (payload) => {
           if (disposed) return;
           setExportPath(null);
           setResearchProgress(null);
+          setActiveSubmission((current) =>
+            current && current.threadId === null ? { ...current, threadId: payload.threadId } : current,
+          );
           void syncThread(payload.threadId);
-          if (activeWorkspace) {
-            void reloadThreads(activeWorkspace.id, payload.threadId);
+          const workspace = activeWorkspaceRef.current;
+          if (workspace) {
+            void reloadThreads(workspace.id, payload.threadId);
           }
         }),
       );
@@ -286,7 +332,7 @@ export function DesktopShell({ children }: DesktopShellProps) {
                       content: payload.token,
                       citations: [],
                       followUps: [],
-                      mode,
+                      mode: modeRef.current,
                       modelUsed: null,
                       isComplete: false,
                       createdAt: new Date().toISOString(),
@@ -335,19 +381,22 @@ export function DesktopShell({ children }: DesktopShellProps) {
       unsubs.push(
         await listenEvent<QueryFinished>('vigilante://assistant-finished', (payload) => {
           if (disposed) return;
-
-          void syncThread(payload.threadId);
-          if (activeWorkspace) {
-            void reloadThreads(activeWorkspace.id, payload.threadId);
-          }
-          void refreshRuntimeState();
-          setIsSubmitting(false);
-          setResearchProgress(null);
+          finishActiveSubmission(payload.threadId);
         }),
       );
-    })().catch((error) => {
+
       if (!disposed) {
-        setStreamError(error instanceof Error ? error.message : 'Failed to register desktop events');
+        setDesktopEventStatus('ready');
+      }
+    };
+
+    void registerDesktopEvents().catch((error) => {
+      if (!disposed) {
+        console.error('Failed to register desktop events', error);
+        setDesktopEventStatus('failed');
+        setActiveSubmission((current) =>
+          current ? { ...current, recoveryMode: 'polling' } : current,
+        );
       }
     });
 
@@ -355,7 +404,107 @@ export function DesktopShell({ children }: DesktopShellProps) {
       disposed = true;
       unsubs.forEach((unsub) => unsub());
     };
-  }, [activeWorkspace, isDesktop, mode, refreshRuntimeState, reloadThreads, syncThread]);
+  }, [isDesktop, refreshRuntimeState, reloadThreads, syncThread]);
+
+  useEffect(() => {
+    if (!activeSubmission || activeSubmission.recoveryMode !== 'polling') {
+      return;
+    }
+
+    let disposed = false;
+    let polling = false;
+
+    const resolveThreadId = async () => {
+      if (activeSubmission.threadId) {
+        return activeSubmission.threadId;
+      }
+
+      const nextThreads = await listThreads(activeSubmission.workspaceId);
+      const submittedAfter = activeSubmission.startedAt - 5_000;
+      const matchingThread =
+        nextThreads.find(
+          (thread) =>
+            (thread.preview === activeSubmission.submittedQuery ||
+              thread.title === activeSubmission.pendingTitle) &&
+            Date.parse(thread.updatedAt) >= submittedAfter,
+        ) ?? null;
+
+      if (matchingThread && !disposed) {
+        setThreads(nextThreads);
+        setActiveSubmission((current) =>
+          current && current.startedAt === activeSubmission.startedAt
+            ? { ...current, threadId: matchingThread.id }
+            : current,
+        );
+      }
+
+      return matchingThread?.id ?? null;
+    };
+
+    const pollSubmission = async () => {
+      if (disposed || polling) {
+        return;
+      }
+
+      polling = true;
+
+      try {
+        const threadId = await resolveThreadId();
+        if (!threadId || disposed) {
+          return;
+        }
+
+        const detail = await openThread(threadId);
+        if (disposed) {
+          return;
+        }
+
+        startTransition(() => {
+          setActiveThread(detail);
+        });
+
+        const lastMessage = detail.messages.at(-1);
+        if (lastMessage?.role === 'assistant' && lastMessage.isComplete) {
+          const [sources, nextThreads] = await Promise.all([
+            listThreadSources(threadId),
+            listThreads(activeSubmission.workspaceId),
+          ]);
+
+          if (disposed) {
+            return;
+          }
+
+          startTransition(() => {
+            setThreadSources(sources);
+            setThreads(nextThreads);
+          });
+
+          void refreshRuntimeState();
+          setIsSubmitting(false);
+          setResearchProgress(null);
+          setActiveSubmission((current) =>
+            current && current.startedAt === activeSubmission.startedAt ? null : current,
+          );
+        }
+      } catch (error) {
+        if (!disposed) {
+          console.error('Failed to poll desktop submission', error);
+        }
+      } finally {
+        polling = false;
+      }
+    };
+
+    void pollSubmission();
+    const interval = window.setInterval(() => {
+      void pollSubmission();
+    }, 700);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+    };
+  }, [activeSubmission, refreshRuntimeState]);
 
   useEffect(() => {
     if (!activeWorkspace || !query.includes('@')) {
@@ -407,6 +556,17 @@ export function DesktopShell({ children }: DesktopShellProps) {
     setAttachments([]);
   }
 
+  function showNotice(message: string, durationMs = 4000) {
+    setSettingsNotice(message);
+    if (noticeTimerRef.current !== null) {
+      window.clearTimeout(noticeTimerRef.current);
+    }
+    noticeTimerRef.current = window.setTimeout(() => {
+      setSettingsNotice(null);
+      noticeTimerRef.current = null;
+    }, durationMs);
+  }
+
   function addAttachmentPaths(paths: string[]) {
     const nextAttachments = paths.map(createAttachment);
     if (nextAttachments.length === 0) return;
@@ -440,31 +600,6 @@ export function DesktopShell({ children }: DesktopShellProps) {
     });
   }
 
-  async function handleWorkspaceSwitch(workspace: Workspace) {
-    try {
-      setActiveWorkspaceState(workspace);
-      await setActiveWorkspace(workspace.id);
-      await reloadThreads(workspace.id);
-    } catch (error) {
-      setStreamError(error instanceof Error ? error.message : 'Failed to switch workspaces');
-    }
-  }
-
-  async function handleCreateWorkspace() {
-    try {
-      const rootPath = await pickWorkspaceDirectory();
-      if (!rootPath) return;
-
-      const workspace = await createWorkspace(inferWorkspaceName(rootPath), rootPath);
-      setActiveWorkspaceState(workspace);
-      setWorkspaces(await listWorkspaces());
-      setSettingsNotice(`Workspace added: ${workspace.name}`);
-      await reloadThreads(workspace.id);
-    } catch (error) {
-      setStreamError(error instanceof Error ? error.message : 'Failed to create workspace');
-    }
-  }
-
   async function handlePickAttachments() {
     try {
       const paths = await pickAttachmentFiles();
@@ -478,7 +613,7 @@ export function DesktopShell({ children }: DesktopShellProps) {
     const droppedPaths = extractDroppedPaths(files);
 
     if (droppedPaths.length === 0) {
-      setSettingsNotice('Drag and drop is not available in this build yet. Use the attach button instead.');
+      showNotice('Drag and drop is not available in this build yet. Use the attach button instead.');
       return;
     }
 
@@ -490,6 +625,11 @@ export function DesktopShell({ children }: DesktopShellProps) {
 
     const submittedQuery = query.trim();
     const currentThreadId = activeThread?.thread.id;
+    const pendingThreadId =
+      currentThreadId && currentThreadId !== 'pending-thread' ? currentThreadId : null;
+    const submissionStartedAt = Date.now();
+    const submissionRecoveryMode: SubmissionRecoveryMode =
+      desktopEventStatus === 'ready' ? 'events' : 'polling';
 
     if (activeView === 'settings') {
       router.push('/');
@@ -501,6 +641,14 @@ export function DesktopShell({ children }: DesktopShellProps) {
     setExportPath(null);
     setIsSubmitting(true);
     setInspectorOpen(false);
+    setActiveSubmission({
+      startedAt: submissionStartedAt,
+      workspaceId: activeWorkspace.id,
+      threadId: pendingThreadId,
+      submittedQuery,
+      pendingTitle: deriveTitle(submittedQuery),
+      recoveryMode: submissionRecoveryMode,
+    });
 
     const optimisticUserMessage: Message = {
       id: `local-user-${Date.now()}`,
@@ -542,13 +690,19 @@ export function DesktopShell({ children }: DesktopShellProps) {
     try {
       const submission = await submitDesktopQuery({
         workspaceId: activeWorkspace.id,
-        threadId: currentThreadId === 'pending-thread' ? null : currentThreadId,
+        threadId: pendingThreadId,
         query: submittedQuery,
         mode,
         webSearch,
         contextItems,
         attachments: [],
       });
+
+      setActiveSubmission((current) =>
+        current && current.startedAt === submissionStartedAt
+          ? { ...current, threadId: submission.threadId }
+          : current,
+      );
 
       setActiveThread((current) => {
         if (!current) return current;
@@ -563,8 +717,18 @@ export function DesktopShell({ children }: DesktopShellProps) {
 
       resetComposerState();
       await reloadThreads(activeWorkspace.id, submission.threadId);
+      setIsSubmitting(false);
+      setResearchProgress(null);
+      setActiveSubmission((current) =>
+        current && current.startedAt === submissionStartedAt ? null : current,
+      );
+      void refreshRuntimeState();
     } catch (error) {
       setIsSubmitting(false);
+      setResearchProgress(null);
+      setActiveSubmission((current) =>
+        current && current.startedAt === submissionStartedAt ? null : current,
+      );
       setQuery(submittedQuery);
       setStreamError(error instanceof Error ? error.message : 'Failed to submit query');
     }
@@ -601,7 +765,7 @@ export function DesktopShell({ children }: DesktopShellProps) {
     try {
       const result: EnsureReadyResult = await ensureRuntimeReady();
       setRuntimeStatus(result.runtime);
-      setSettingsNotice(
+      showNotice(
         result.startOutcome
           ? `Runtime status: ${result.startOutcome.replaceAll('_', ' ')}`
           : 'Runtime checked.',
@@ -620,7 +784,7 @@ export function DesktopShell({ children }: DesktopShellProps) {
     try {
       const path = await exportWorkspaceThread(activeThread.thread.id, format);
       setExportPath(path);
-      setSettingsNotice(`Thread exported as ${format.toUpperCase()}.`);
+      showNotice(`Thread exported as ${format.toUpperCase()}.`);
       setInspectorOpen(true);
     } catch (error) {
       setStreamError(error instanceof Error ? error.message : 'Failed to export thread');
@@ -665,7 +829,7 @@ export function DesktopShell({ children }: DesktopShellProps) {
             }
           : current,
       );
-      setSettingsNotice(`Model ready: ${persistedModelId}`);
+      showNotice(`Model ready: ${persistedModelId}`);
       await refreshRuntimeState();
     } catch (error) {
       setSettingsDraft((current) =>
@@ -691,7 +855,7 @@ export function DesktopShell({ children }: DesktopShellProps) {
         const next = current.filter((entry) => entry.modelId !== modelId);
         return [...next, job];
       });
-      setSettingsNotice(`Downloading ${modelId} into Vigilante storage.`);
+      showNotice(`Downloading ${modelId} into Vigilante storage.`);
     } catch (error) {
       setStreamError(error instanceof Error ? error.message : 'Failed to start model download');
     }
@@ -703,7 +867,7 @@ export function DesktopShell({ children }: DesktopShellProps) {
       setActiveInstallJobs((current) =>
         current.filter((job) => job.id !== jobId && job.id !== cancelledJob?.id),
       );
-      setSettingsNotice('Model download cancelled.');
+      showNotice('Model download cancelled.');
       await refreshRuntimeState();
     } catch (error) {
       setStreamError(error instanceof Error ? error.message : 'Failed to cancel download');
@@ -729,7 +893,7 @@ export function DesktopShell({ children }: DesktopShellProps) {
       const saved = await updateSettings(nextSettings);
       setSettingsDraft(saved);
       setTheme(saved.appearance.theme);
-      setSettingsNotice('Appearance updated.');
+      showNotice('Appearance updated.');
     } catch (error) {
       setSettingsDraft((current) =>
         current
@@ -783,7 +947,7 @@ export function DesktopShell({ children }: DesktopShellProps) {
           <h1 className="font-serif text-[34px] tracking-[-0.03em] text-[#f1e8df]">Desktop only</h1>
           <p className="mt-3 text-[14px] text-text-secondary">
             Vigilante now supports the Tauri desktop shell only. Launch the desktop app to use
-            local workspaces, managed models, and saved chats.
+            local workspaces, local models, and saved chats.
           </p>
         </div>
       </div>
@@ -791,41 +955,33 @@ export function DesktopShell({ children }: DesktopShellProps) {
   }
 
   return (
-    <div className="relative flex h-screen overflow-hidden bg-bg-base text-text-primary">
+    <div className="relative flex h-screen w-full overflow-hidden bg-bg-base text-text-primary">
       {children ? <div className="hidden">{children}</div> : null}
 
       <DesktopSidebar
         activeThreadId={activeThread?.thread.id ?? null}
         activeView={activeView}
         activeWorkspace={activeWorkspace}
-        onCreateWorkspace={() => void handleCreateWorkspace()}
         onDeleteThread={(threadId) => void handleDeleteThread(threadId)}
         onNewThread={handleNewThread}
         onOpenSettings={handleOpenSettings}
         onSearchThreadsChange={setSearchThreads}
         onSelectThread={(threadId) => void handleSelectThread(threadId)}
-        onSelectWorkspace={(workspace) => void handleWorkspaceSwitch(workspace)}
         searchThreads={searchThreads}
         threads={visibleThreads}
-        workspaces={workspaces}
       />
 
       {activeView === 'settings' ? (
         <DesktopSettingsView
           activeInstallJobs={activeInstallJobs}
-          managedRuntime={managedRuntime}
           modelCatalog={modelCatalog}
           onBackToChat={handleBackToChat}
           onCancelInstall={(jobId) => void handleCancelInstall(jobId)}
-          onEnsureRuntime={() => void handleEnsureRuntime()}
           onInstallModel={(modelId) => void handleInstallModel(modelId)}
           onSelectModel={(modelId) => void handleSelectModel(modelId)}
           onThemeChange={(theme) => void handleThemeChange(theme)}
           runtimeModels={runtimeModels}
-          runtimeBusy={runtimeBusy}
-          runtimeStatus={runtimeStatus}
           selectedModelId={selectedModelId}
-          storageInfo={storageInfo}
           theme={settingsDraft?.appearance.theme ?? 'system'}
         />
       ) : (
@@ -850,7 +1006,6 @@ export function DesktopShell({ children }: DesktopShellProps) {
           onSelectModel={(modelId) => void handleSelectModel(modelId)}
           onSubmit={() => void handleSubmit()}
           onToggleWebSearch={() => setWebSearch((current) => !current)}
-          onUploadImages={() => void handlePickAttachments()}
           query={query}
           researchProgress={researchProgress}
           runtimeModels={runtimeModels}
