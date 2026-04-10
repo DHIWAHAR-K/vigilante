@@ -616,3 +616,23 @@ export function deleteModel(modelId: string): Promise<void> {
 export function getStorageInfo(): Promise<StorageInfo> {
   return invokeCommand('get_storage_info_cmd');
 }
+
+export async function minimizeWindow(): Promise<void> {
+  const { getCurrentWindow } = await import('@tauri-apps/api/window');
+  return getCurrentWindow().minimize();
+}
+
+export async function toggleMaximizeWindow(): Promise<void> {
+  const { getCurrentWindow } = await import('@tauri-apps/api/window');
+  const win = getCurrentWindow();
+  const isMaximized = await win.isMaximized();
+  if (isMaximized) {
+    return win.unmaximize();
+  }
+  return win.maximize();
+}
+
+export async function closeWindow(): Promise<void> {
+  const { getCurrentWindow } = await import('@tauri-apps/api/window');
+  return getCurrentWindow().close();
+}
