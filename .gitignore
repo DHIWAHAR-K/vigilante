@@ -25,3 +25,5 @@ apps/web/src-tauri/gen/
 # Editor
 .idea/
 *.swp
+.cursor/
+.claude/
