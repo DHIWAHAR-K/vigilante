@@ -1,63 +1,43 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import {
-  ArrowLeft,
-  Check,
-  Download,
-  HardDriveDownload,
-  Loader2,
-  PackageOpen,
-  ShieldCheck,
-} from 'lucide-react';
+import { ArrowLeft, Check, Download, HardDriveDownload, Loader2, Maximize2, Minus, ShieldCheck, X } from 'lucide-react';
+import { minimizeWindow, toggleMaximizeWindow, closeWindow } from '@/lib/desktop/client';
 
 import {
   CatalogModel,
-  ManagedRuntimeInfo,
   ModelInfo,
   ModelInstallJob,
-  OllamaRuntimeStatusInfo,
-  StorageInfo,
   Theme,
 } from '@/lib/desktop/client';
 import { cn } from '@/lib/utils';
 import { ThemeSegmentedControl } from '@/components/theme/ThemeSegmentedControl';
 
-import { formatBytes, formatModelSize, runtimeLabel, runtimeTone } from './utils';
+import { formatBytes, formatModelSize } from './utils';
 
 interface DesktopSettingsViewProps {
   activeInstallJobs: ModelInstallJob[];
-  managedRuntime: ManagedRuntimeInfo | null;
   modelCatalog: CatalogModel[];
   onBackToChat: () => void;
   onCancelInstall: (jobId: string) => void;
-  onEnsureRuntime: () => void;
   onInstallModel: (modelId: string) => void;
   onSelectModel: (modelId: string) => void;
   onThemeChange: (theme: Theme) => void;
   runtimeModels: ModelInfo[];
-  runtimeBusy: boolean;
-  runtimeStatus: OllamaRuntimeStatusInfo | null;
   selectedModelId: string | null;
-  storageInfo: StorageInfo | null;
   theme: Theme;
 }
 
 export function DesktopSettingsView({
   activeInstallJobs,
-  managedRuntime,
   modelCatalog,
   onBackToChat,
   onCancelInstall,
-  onEnsureRuntime,
   onInstallModel,
   onSelectModel,
   onThemeChange,
   runtimeModels,
-  runtimeBusy,
-  runtimeStatus,
   selectedModelId,
-  storageInfo,
   theme,
 }: DesktopSettingsViewProps) {
   const installedModelIds = useMemo(
@@ -73,9 +53,40 @@ export function DesktopSettingsView({
   }, [activeInstallJobs]);
 
   return (
-    <main className="desktop-scrollbar flex min-w-0 flex-1 flex-col overflow-y-auto bg-bg-base">
+    <main className="desktop-scrollbar flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-bg-base">
+      {/* Titlebar drag region with window controls */}
+      <div
+        data-tauri-drag-region
+        className="flex h-11 shrink-0 items-center pl-20 pr-4"
+      >
+        <div data-tauri-drag-region className="flex-1" />
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={() => void minimizeWindow()}
+            className="rounded p-1.5 text-text-muted transition hover:bg-bg-elevated hover:text-text-primary"
+            title="Minimize"
+          >
+            <Minus className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => void toggleMaximizeWindow()}
+            className="rounded p-1.5 text-text-muted transition hover:bg-bg-elevated hover:text-text-primary"
+            title="Maximize / Restore"
+          >
+            <Maximize2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => void closeWindow()}
+            className="rounded p-1.5 text-text-muted transition hover:bg-bg-elevated hover:text-destructive"
+            title="Close"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 py-6 lg:px-10">
-        <div className="flex items-center justify-between gap-4">
+        <div>
           <div>
             <button
               onClick={onBackToChat}
@@ -86,88 +97,24 @@ export function DesktopSettingsView({
             </button>
             <h1 className="text-display-sm text-text-primary">Settings</h1>
             <p className="mt-2 max-w-2xl text-body-sm text-text-secondary">
-              Vigilante now runs as a desktop-only workspace. Themes, local runtime health, and
-              supported model downloads all live here.
+              Vigilante keeps everything on-device. Choose your theme and manage the local models
+              available in the desktop composer.
             </p>
-          </div>
-
-          <div className="hidden lg:flex">
-            <span className={cn('rounded-full border px-3 py-1.5 text-[11px]', runtimeTone(runtimeStatus))}>
-              {runtimeLabel(runtimeStatus)}
-            </span>
           </div>
         </div>
 
-        <section className="grid gap-6 lg:grid-cols-[0.95fr,1.05fr]">
-          <div className="desktop-panel-strong rounded-[28px] p-6">
-            <div className="mb-6 flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-text-muted">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Appearance
-            </div>
-            <h2 className="text-heading-md text-text-primary">Theme</h2>
-            <p className="mt-2 max-w-md text-body-sm text-text-secondary">
-              Choose how Vigilante looks across the desktop shell.
-            </p>
-
-            <div className="mt-5">
-              <ThemeSegmentedControl value={theme} onChange={onThemeChange} />
-            </div>
+        <section className="desktop-panel-strong w-full rounded-[28px] p-6">
+          <div className="mb-6 flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-text-muted">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Appearance
           </div>
+          <h2 className="text-heading-md text-text-primary">Theme</h2>
+          <p className="mt-2 max-w-full text-body-sm text-text-secondary">
+            Choose how Vigilante looks across the desktop shell.
+          </p>
 
-          <div className="desktop-panel-strong rounded-[28px] p-6">
-            <div className="mb-6 flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-text-muted">
-              <PackageOpen className="h-3.5 w-3.5" />
-              Managed Runtime
-            </div>
-
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h2 className="text-heading-md text-text-primary">Vigilante-managed Ollama</h2>
-                <p className="mt-2 max-w-xl text-body-sm text-text-secondary">
-                  Model downloads are stored inside Vigilante&apos;s app data directory and served by
-                  the managed local runtime.
-                </p>
-              </div>
-
-              <button
-                onClick={onEnsureRuntime}
-                disabled={runtimeBusy}
-                className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-surface px-4 py-2 text-[12px] font-medium text-text-secondary transition hover:bg-bg-elevated hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {runtimeBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                Refresh runtime
-              </button>
-            </div>
-
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-border-subtle bg-bg-surface px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-text-muted">App Data</p>
-                <p className="mt-2 break-all text-[13px] text-text-primary">
-                  {storageInfo?.basePath ?? 'Loading…'}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-border-subtle bg-bg-surface px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-text-muted">Models Directory</p>
-                <p className="mt-2 break-all text-[13px] text-text-primary">
-                  {managedRuntime?.modelsDir ?? 'Loading…'}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-border-subtle bg-bg-surface px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-text-muted">Runtime URL</p>
-                <p className="mt-2 break-all text-[13px] text-text-primary">
-                  {managedRuntime?.baseUrl ?? runtimeStatus?.baseUrl ?? 'Loading…'}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-border-subtle bg-bg-surface px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-text-muted">Managed Mode</p>
-                <p className="mt-2 text-[13px] text-text-primary">
-                  {managedRuntime?.managed ? 'Enabled' : 'Starting…'}
-                </p>
-              </div>
-            </div>
+          <div className="mt-5">
+            <ThemeSegmentedControl value={theme} onChange={onThemeChange} />
           </div>
         </section>
 
@@ -176,12 +123,12 @@ export function DesktopSettingsView({
             <div>
               <div className="mb-3 flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-text-muted">
                 <HardDriveDownload className="h-3.5 w-3.5" />
-                Supported Models
+                Local Models
               </div>
-              <h2 className="text-heading-md text-text-primary">Download models for this desktop</h2>
+              <h2 className="text-heading-md text-text-primary">Choose models for this desktop</h2>
               <p className="mt-2 max-w-2xl text-body-sm text-text-secondary">
-                This list is the supported Vigilante catalog. Downloaded models become available in
-                the composer immediately.
+                Downloaded models stay on this machine and become available in the composer as soon
+                as they are ready.
               </p>
             </div>
 
