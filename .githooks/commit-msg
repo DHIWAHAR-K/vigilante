@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel)
+subject=$(sed -n '1p' "$1")
+"$repo_root/scripts/validate-commit-message.sh" "$subject"
