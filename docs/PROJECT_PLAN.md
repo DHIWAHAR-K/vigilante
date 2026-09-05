@@ -1,8 +1,8 @@
 # Rebuild Project Plan
 
-Status: **GREEN — governance preparation**
+Status: **GREEN — product definition**
 
-Implementation has not started. The current objective is to approve the working agreement, then define the product and architecture before creating a foundation.
+Governance and repository controls are complete. Implementation has not started. The current objective is to define and approve the product milestone before choosing the architecture or creating a foundation.
 
 ## Gates
 
