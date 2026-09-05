@@ -31,3 +31,9 @@ The initial required check is `Governance / Policy`. During foundation work, add
 ## Change control
 
 Any later repository-settings or ruleset change requires an explicit request. Record the date, reason, old value, and new value here.
+
+| Date | Reason | Old value | New value |
+| --- | --- | --- | --- |
+| 2026-09-05 | Align merge settings with the solo-maintainer policy | Merge commits, squash merges, and rebase merges enabled; automatic branch deletion disabled | Squash merges only; automatic branch deletion enabled |
+| 2026-09-05 | Make pull-request review usable by one maintainer | One approval, latest-push approval, and extra approval for unattributed changes required | Zero approvals; latest-push and unattributed-change approval requirements disabled |
+| 2026-09-05 | Enforce the governance workflow | No required status check | `Policy` from GitHub Actions is required and must pass against current `main` |
