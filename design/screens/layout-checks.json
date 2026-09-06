@@ -1,0 +1,182 @@
+[
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 844,
+    "mainOverflow": false,
+    "messageHeight": 48,
+    "overlap": false,
+    "state": "empty",
+    "width": 390
+  },
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 844,
+    "mainOverflow": false,
+    "messageHeight": 614,
+    "overlap": false,
+    "state": "conversation",
+    "width": 390
+  },
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 568,
+    "mainOverflow": false,
+    "messageHeight": 48,
+    "overlap": false,
+    "state": "empty",
+    "width": 320
+  },
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 568,
+    "mainOverflow": false,
+    "messageHeight": 338,
+    "overlap": false,
+    "state": "conversation",
+    "width": 320
+  },
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 667,
+    "mainOverflow": false,
+    "messageHeight": 48,
+    "overlap": false,
+    "state": "empty",
+    "width": 375
+  },
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 667,
+    "mainOverflow": false,
+    "messageHeight": 437,
+    "overlap": false,
+    "state": "conversation",
+    "width": 375
+  },
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 932,
+    "mainOverflow": false,
+    "messageHeight": 48,
+    "overlap": false,
+    "state": "empty",
+    "width": 430
+  },
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 932,
+    "mainOverflow": false,
+    "messageHeight": 702,
+    "overlap": false,
+    "state": "conversation",
+    "width": 430
+  },
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 1024,
+    "mainOverflow": false,
+    "messageHeight": 50,
+    "overlap": false,
+    "state": "empty",
+    "width": 768
+  },
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 1024,
+    "mainOverflow": false,
+    "messageHeight": 794,
+    "overlap": false,
+    "state": "conversation",
+    "width": 768
+  },
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 375,
+    "mainOverflow": false,
+    "messageHeight": 48,
+    "overlap": false,
+    "state": "empty",
+    "width": 812
+  },
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 375,
+    "mainOverflow": false,
+    "messageHeight": 157,
+    "overlap": false,
+    "state": "conversation",
+    "width": 812
+  },
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 700,
+    "mainOverflow": false,
+    "messageHeight": 50,
+    "overlap": false,
+    "state": "empty",
+    "width": 900
+  },
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 700,
+    "mainOverflow": false,
+    "messageHeight": 470,
+    "overlap": false,
+    "state": "conversation",
+    "width": 900
+  },
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 768,
+    "mainOverflow": false,
+    "messageHeight": 91,
+    "overlap": false,
+    "state": "empty",
+    "width": 1024
+  },
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 768,
+    "mainOverflow": false,
+    "messageHeight": 521,
+    "overlap": false,
+    "state": "conversation",
+    "width": 1024
+  },
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 1000,
+    "mainOverflow": false,
+    "messageHeight": 93,
+    "overlap": false,
+    "state": "empty",
+    "width": 1440
+  },
+  {
+    "composerOverflow": false,
+    "footer": false,
+    "height": 1000,
+    "mainOverflow": false,
+    "messageHeight": 753,
+    "overlap": false,
+    "state": "conversation",
+    "width": 1440
+  }
+]

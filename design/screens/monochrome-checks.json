@@ -1,0 +1,122 @@
+[
+  {
+    "canvas": "rgb(17, 17, 17)",
+    "composerOverflow": false,
+    "dialogOpen": false,
+    "dialogOverflow": false,
+    "height": 1000,
+    "messageOverflow": false,
+    "overlap": false,
+    "send": "rgb(255, 255, 255)",
+    "sidebarWidth": 240,
+    "width": 1440
+  },
+  {
+    "canvas": "rgb(17, 17, 17)",
+    "composerOverflow": false,
+    "dialogOpen": false,
+    "dialogOverflow": false,
+    "height": 1000,
+    "messageOverflow": false,
+    "overlap": false,
+    "send": "rgb(255, 255, 255)",
+    "sidebarWidth": 56,
+    "width": 1440
+  },
+  {
+    "canvas": "rgb(17, 17, 17)",
+    "composerOverflow": false,
+    "dialogOpen": false,
+    "dialogOverflow": false,
+    "height": 700,
+    "messageOverflow": false,
+    "overlap": false,
+    "send": "rgb(255, 255, 255)",
+    "sidebarWidth": 240,
+    "width": 960
+  },
+  {
+    "canvas": "rgb(17, 17, 17)",
+    "composerOverflow": false,
+    "dialogOpen": false,
+    "dialogOverflow": false,
+    "height": 700,
+    "messageOverflow": false,
+    "overlap": false,
+    "send": "rgb(255, 255, 255)",
+    "sidebarWidth": 56,
+    "width": 960
+  },
+  {
+    "canvas": "rgb(17, 17, 17)",
+    "composerOverflow": false,
+    "dialogOpen": false,
+    "dialogOverflow": false,
+    "height": 844,
+    "messageOverflow": false,
+    "overlap": false,
+    "send": "rgb(255, 255, 255)",
+    "sidebarWidth": 0,
+    "width": 390
+  },
+  {
+    "canvas": "rgb(17, 17, 17)",
+    "composerOverflow": false,
+    "dialogOpen": true,
+    "dialogOverflow": false,
+    "height": 844,
+    "messageOverflow": false,
+    "overlap": false,
+    "send": "rgb(255, 255, 255)",
+    "sidebarWidth": 0,
+    "width": 390
+  },
+  {
+    "canvas": "rgb(17, 17, 17)",
+    "composerOverflow": false,
+    "dialogOpen": false,
+    "dialogOverflow": false,
+    "height": 568,
+    "messageOverflow": false,
+    "overlap": false,
+    "send": "rgb(255, 255, 255)",
+    "sidebarWidth": 0,
+    "width": 320
+  },
+  {
+    "canvas": "rgb(17, 17, 17)",
+    "composerOverflow": false,
+    "dialogOpen": true,
+    "dialogOverflow": false,
+    "height": 568,
+    "messageOverflow": false,
+    "overlap": false,
+    "send": "rgb(255, 255, 255)",
+    "sidebarWidth": 0,
+    "width": 320
+  },
+  {
+    "canvas": "rgb(17, 17, 17)",
+    "composerOverflow": false,
+    "dialogOpen": false,
+    "dialogOverflow": false,
+    "height": 375,
+    "messageOverflow": false,
+    "overlap": false,
+    "send": "rgb(255, 255, 255)",
+    "sidebarWidth": 0,
+    "width": 812
+  },
+  {
+    "canvas": "rgb(17, 17, 17)",
+    "composerOverflow": false,
+    "dialogOpen": false,
+    "dialogOverflow": false,
+    "height": 375,
+    "messageOverflow": false,
+    "overlap": false,
+    "send": "rgb(255, 255, 255)",
+    "sidebarWidth": 0,
+    "width": 812
+  }
+]

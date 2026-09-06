@@ -7,6 +7,9 @@ All notable changes to Vigilante will be recorded here. The format follows [Keep
 ### Added
 
 - Rebuild governance, versioning, review, and release rules.
+- Proposed responsive product designs, minimal single-conversation prototype with a black-and-white Perplexity-style layout, refined phone screens, compact inline citations, a centered SVG mark, and searchable conversation history, and coding-agent handoff in `design/`.
+- Accepted v1 web architecture decisions for the Next.js/Vercel runtime, Supabase auth/data boundary, and AI/retrieval consent boundary.
+- Added a buildable Next.js web foundation with Supabase SSR auth, protected app routing, conversation persistence boundaries, web-consent capture, local quality scripts, and CI web checks.
 
 ## Historical releases
 

@@ -20,7 +20,7 @@ The pull request itself is the review boundary: complete its checklist, inspect 
 
 ## Bootstrap exception
 
-The 2026-09-05 repository reset was explicitly authorized to remove all old commits, tags, and releases and establish this governance root commit. It required a one-time protected-branch bypass and history replacement. The old Git history and release metadata were retained locally for recovery; the release assets were not downloaded.
+The 2026-09-05 repository reset was explicitly authorized to remove all old commits, tags, and releases and establish this governance root commit. It required a one-time protected-branch bypass and history replacement. The old Git history and release metadata were initially retained locally for recovery, then permanently deleted with the owner's explicit authorization; the release assets were never downloaded.
 
 This exception does not authorize later force pushes, direct `main` pushes, or tag changes.
 

@@ -1,0 +1,50 @@
+{
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@10.9.2",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint src next.config.ts vitest.config.ts playwright.config.ts eslint.config.mjs --max-warnings=0",
+    "format": "./scripts/format-web-foundation.sh write",
+    "format:check": "./scripts/format-web-foundation.sh check",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "governance": "./scripts/validate-governance.sh",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build && npm run governance"
+  },
+  "dependencies": {
+    "@supabase/ssr": "0.12.6",
+    "@supabase/supabase-js": "2.115.0",
+    "lucide-react": "1.41.0",
+    "next": "16.3.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@next/eslint-plugin-next": "16.3.4",
+    "@playwright/test": "1.63.0",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.7",
+    "@types/node": "26.4.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "eslint": "10.10.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "16.4.0",
+    "jsdom": "29.0.0",
+    "prettier": "3.9.6",
+    "typescript-eslint": "8.69.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.0"
+  }
+}

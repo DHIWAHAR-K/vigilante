@@ -22,7 +22,15 @@ for path in .githooks/pre-commit .githooks/commit-msg .githooks/pre-push scripts
   fi
 done
 
-if find . -type f ! -path './.git' ! -path './.git/*' -print0 | xargs -0 grep -IEn '[[:blank:]]+$'; then
+if find . \
+  -path './.git' -prune -o \
+  -path './.next' -prune -o \
+  -path './.super-human' -prune -o \
+  -path './coverage' -prune -o \
+  -path './node_modules' -prune -o \
+  -path './playwright-report' -prune -o \
+  -path './test-results' -prune -o \
+  -type f -print0 | xargs -0 grep -IEn '[[:blank:]]+$'; then
   echo "trailing whitespace detected" >&2
   exit 1
 fi

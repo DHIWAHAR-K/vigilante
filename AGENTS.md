@@ -3,9 +3,9 @@
 ## Current phase
 
 - Vigilante is maintained by one person. Use the solo-maintainer review policy in `docs/GITHUB_RULES.md`.
-- This is the clean Vigilante rebuild tree. The original implementation is preserved in the primary local checkout as reference and must not be copied wholesale into this tree.
+- This is the clean Vigilante rebuild tree. The previous implementation and its local recovery copies were permanently deleted on 2026-09-05 and must not be restored or reintroduced.
 - Governance and design precede implementation. Read `docs/PROJECT_PLAN.md`, `docs/DEVELOPMENT.md`, and `docs/VERSIONING.md` before changing the project.
-- Do not infer the rebuild architecture from the legacy implementation. Record durable choices in `docs/decisions/` before foundation work.
+- Derive the rebuild architecture from approved product requirements. Record durable choices in `docs/decisions/` before foundation work.
 
 ## Git authorization
 
