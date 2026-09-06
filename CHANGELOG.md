@@ -4,6 +4,8 @@ All notable changes to Vigilante will be recorded here. The format follows [Keep
 
 ## Unreleased
 
+## 0.2.0-alpha.1 - 2026-09-06
+
 ### Added
 
 - Rebuild governance, versioning, review, and release rules.
