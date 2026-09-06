@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version from VERSION, without the v prefix
+        required: true
+        type: string
+      draft:
+        description: Create a draft release instead of publishing immediately
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  tag-and-publish:
+    name: Tag and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release state
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "Release workflow must run from main." >&2
+            exit 1
+          fi
+
+          version="$(./scripts/validate-version.sh)"
+          if [ "$version" != "${{ inputs.version }}" ]; then
+            echo "Input version ${{ inputs.version }} does not match VERSION $version." >&2
+            exit 1
+          fi
+
+          if ! grep -Fq "## ${version} - " CHANGELOG.md; then
+            echo "CHANGELOG.md is missing a dated section for $version." >&2
+            exit 1
+          fi
+
+          tag_name="v${version}"
+          git fetch --tags --force
+          if git rev-parse -q --verify "refs/tags/${tag_name}" >/dev/null; then
+            echo "Tag ${tag_name} already exists." >&2
+            exit 1
+          fi
+
+          awk -v version="$version" '
+            index($0, "## " version " - ") == 1 { capture = 1; next }
+            capture && /^## / { exit }
+            capture { print }
+          ' CHANGELOG.md > release-notes.md
+
+          if [ ! -s release-notes.md ]; then
+            echo "No release notes found for $version." >&2
+            exit 1
+          fi
+
+          {
+            echo "tag_name=${tag_name}"
+            echo "version=${version}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create annotated tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.release.outputs.tag_name }}" -m "${{ steps.release.outputs.tag_name }}"
+          git push origin "refs/tags/${{ steps.release.outputs.tag_name }}"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          prerelease_flag=""
+          case "${{ steps.release.outputs.version }}" in
+            *-alpha.*|*-beta.*|*-rc.*)
+              prerelease_flag="--prerelease"
+              ;;
+          esac
+
+          draft_flag=""
+          if [ "${{ inputs.draft }}" = "true" ]; then
+            draft_flag="--draft"
+          fi
+
+          gh release create "${{ steps.release.outputs.tag_name }}" \
+            --title "${{ steps.release.outputs.tag_name }}" \
+            --notes-file release-notes.md \
+            $prerelease_flag \
+            $draft_flag

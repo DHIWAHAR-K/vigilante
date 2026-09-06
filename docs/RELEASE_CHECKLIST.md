@@ -22,8 +22,8 @@
 
 ## Publish
 
-- [ ] Create an annotated `v<version>` tag from the approved `main` commit.
-- [ ] Build artifacts from that tag in CI; do not rebuild unrecorded local state.
+- [ ] Run the `Release` workflow from the approved `main` commit to create the annotated `v<version>` tag.
+- [ ] Build artifacts from that tag in CI when release assets exist; do not rebuild unrecorded local state.
 - [ ] Verify artifact names, checksums, signatures/notarization status, and release metadata.
 - [ ] Mark alpha, beta, and RC versions as prereleases.
 - [ ] Review the draft release and obtain explicit publication authorization.

@@ -77,4 +77,6 @@ GitHub protects `main` from deletion and force pushes and requires pull requests
 
 Local Git uses `.githooks`: the clean worktree rejects commits on `main`, runs governance checks before feature-branch commits, validates every commit subject, and permits pushes only to `codex/*` branches. Direct `main` and tag pushes are blocked.
 
+Formal releases use the `Release` GitHub Actions workflow from a validated `main` commit. Run it with the exact version from `VERSION`; it validates the dated changelog section, creates the annotated `v<version>` tag, and publishes the GitHub release. Alpha, beta, and RC versions are marked as prereleases.
+
 The authorized history reset and governance root commit are a one-time bootstrap exception to the no-force-push and pull-request rules. The bootstrap controls are active: the governance CI check is required, repository-level merge commits and rebase merges are disabled, and merged branches are deleted automatically.
