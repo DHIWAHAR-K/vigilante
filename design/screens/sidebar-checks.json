@@ -1,0 +1,74 @@
+[
+  {
+    "composerOverflow": false,
+    "drawerOpen": false,
+    "drawerOverflow": false,
+    "height": 1000,
+    "historyButtonVisible": false,
+    "messageOverflow": false,
+    "rowsFit": true,
+    "sidebarVisible": true,
+    "sidebarWidth": 240,
+    "width": 1440
+  },
+  {
+    "composerOverflow": false,
+    "drawerOpen": false,
+    "drawerOverflow": false,
+    "height": 700,
+    "historyButtonVisible": false,
+    "messageOverflow": false,
+    "rowsFit": true,
+    "sidebarVisible": true,
+    "sidebarWidth": 240,
+    "width": 960
+  },
+  {
+    "composerOverflow": false,
+    "drawerOpen": false,
+    "drawerOverflow": false,
+    "height": 768,
+    "historyButtonVisible": false,
+    "messageOverflow": false,
+    "rowsFit": true,
+    "sidebarVisible": true,
+    "sidebarWidth": 240,
+    "width": 1024
+  },
+  {
+    "composerOverflow": false,
+    "drawerOpen": true,
+    "drawerOverflow": false,
+    "height": 844,
+    "historyButtonVisible": true,
+    "messageOverflow": false,
+    "rowsFit": true,
+    "sidebarVisible": false,
+    "sidebarWidth": 0,
+    "width": 390
+  },
+  {
+    "composerOverflow": false,
+    "drawerOpen": true,
+    "drawerOverflow": false,
+    "height": 568,
+    "historyButtonVisible": true,
+    "messageOverflow": false,
+    "rowsFit": true,
+    "sidebarVisible": false,
+    "sidebarWidth": 0,
+    "width": 320
+  },
+  {
+    "composerOverflow": false,
+    "drawerOpen": false,
+    "drawerOverflow": false,
+    "height": 700,
+    "historyButtonVisible": true,
+    "messageOverflow": false,
+    "rowsFit": true,
+    "sidebarVisible": false,
+    "sidebarWidth": 0,
+    "width": 959
+  }
+]

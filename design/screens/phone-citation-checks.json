@@ -1,0 +1,278 @@
+[
+  {
+    "chipAbsent": true,
+    "composerButtons": [
+      "More options",
+      "Web search",
+      "Send message"
+    ],
+    "composerOverflow": false,
+    "empty": false,
+    "height": 844,
+    "marksLoaded": true,
+    "messageHeight": 658,
+    "messageOverflow": false,
+    "overlap": false,
+    "phoneBrandCenterError": 0.00390625,
+    "width": 390
+  },
+  {
+    "chipAbsent": true,
+    "composerButtons": [
+      "More options",
+      "Web search",
+      "Send message"
+    ],
+    "composerOverflow": false,
+    "empty": true,
+    "height": 844,
+    "marksLoaded": true,
+    "messageHeight": 82,
+    "messageOverflow": false,
+    "overlap": false,
+    "phoneBrandCenterError": 0.00390625,
+    "width": 390
+  },
+  {
+    "chipAbsent": true,
+    "composerButtons": [
+      "More options",
+      "Web search",
+      "Send message"
+    ],
+    "composerOverflow": false,
+    "empty": true,
+    "height": 568,
+    "marksLoaded": true,
+    "messageHeight": 82,
+    "messageOverflow": false,
+    "overlap": false,
+    "phoneBrandCenterError": 0.00390625,
+    "width": 320
+  },
+  {
+    "chipAbsent": true,
+    "composerButtons": [
+      "More options",
+      "Web search",
+      "Send message"
+    ],
+    "composerOverflow": false,
+    "empty": false,
+    "height": 568,
+    "marksLoaded": true,
+    "messageHeight": 382,
+    "messageOverflow": false,
+    "overlap": false,
+    "phoneBrandCenterError": 0.00390625,
+    "width": 320
+  },
+  {
+    "chipAbsent": true,
+    "composerButtons": [
+      "More options",
+      "Web search",
+      "Send message"
+    ],
+    "composerOverflow": false,
+    "empty": true,
+    "height": 667,
+    "marksLoaded": true,
+    "messageHeight": 82,
+    "messageOverflow": false,
+    "overlap": false,
+    "phoneBrandCenterError": 0.00390625,
+    "width": 375
+  },
+  {
+    "chipAbsent": true,
+    "composerButtons": [
+      "More options",
+      "Web search",
+      "Send message"
+    ],
+    "composerOverflow": false,
+    "empty": false,
+    "height": 667,
+    "marksLoaded": true,
+    "messageHeight": 481,
+    "messageOverflow": false,
+    "overlap": false,
+    "phoneBrandCenterError": 0.00390625,
+    "width": 375
+  },
+  {
+    "chipAbsent": true,
+    "composerButtons": [
+      "More options",
+      "Web search",
+      "Send message"
+    ],
+    "composerOverflow": false,
+    "empty": true,
+    "height": 932,
+    "marksLoaded": true,
+    "messageHeight": 82,
+    "messageOverflow": false,
+    "overlap": false,
+    "phoneBrandCenterError": 0.00390625,
+    "width": 430
+  },
+  {
+    "chipAbsent": true,
+    "composerButtons": [
+      "More options",
+      "Web search",
+      "Send message"
+    ],
+    "composerOverflow": false,
+    "empty": false,
+    "height": 932,
+    "marksLoaded": true,
+    "messageHeight": 746,
+    "messageOverflow": false,
+    "overlap": false,
+    "phoneBrandCenterError": 0.00390625,
+    "width": 430
+  },
+  {
+    "chipAbsent": true,
+    "composerButtons": [
+      "More options",
+      "Web search",
+      "Send message"
+    ],
+    "composerOverflow": false,
+    "empty": true,
+    "height": 1024,
+    "marksLoaded": true,
+    "messageHeight": 82,
+    "messageOverflow": false,
+    "overlap": false,
+    "phoneBrandCenterError": 0.00390625,
+    "width": 768
+  },
+  {
+    "chipAbsent": true,
+    "composerButtons": [
+      "More options",
+      "Web search",
+      "Send message"
+    ],
+    "composerOverflow": false,
+    "empty": false,
+    "height": 1024,
+    "marksLoaded": true,
+    "messageHeight": 838,
+    "messageOverflow": false,
+    "overlap": false,
+    "phoneBrandCenterError": 0.00390625,
+    "width": 768
+  },
+  {
+    "chipAbsent": true,
+    "composerButtons": [
+      "More options",
+      "Web search",
+      "Send message"
+    ],
+    "composerOverflow": false,
+    "empty": true,
+    "height": 375,
+    "marksLoaded": true,
+    "messageHeight": 77,
+    "messageOverflow": false,
+    "overlap": false,
+    "phoneBrandCenterError": 0.00390625,
+    "width": 812
+  },
+  {
+    "chipAbsent": true,
+    "composerButtons": [
+      "More options",
+      "Web search",
+      "Send message"
+    ],
+    "composerOverflow": false,
+    "empty": false,
+    "height": 375,
+    "marksLoaded": true,
+    "messageHeight": 201,
+    "messageOverflow": false,
+    "overlap": false,
+    "phoneBrandCenterError": 0.00390625,
+    "width": 812
+  },
+  {
+    "chipAbsent": true,
+    "composerButtons": [
+      "Add sources",
+      "Web search",
+      "Choose model",
+      "Send message"
+    ],
+    "composerOverflow": false,
+    "empty": true,
+    "height": 700,
+    "marksLoaded": true,
+    "messageHeight": 91,
+    "messageOverflow": false,
+    "overlap": false,
+    "phoneBrandCenterError": null,
+    "width": 960
+  },
+  {
+    "chipAbsent": true,
+    "composerButtons": [
+      "Add sources",
+      "Web search",
+      "Choose model",
+      "Send message"
+    ],
+    "composerOverflow": false,
+    "empty": false,
+    "height": 700,
+    "marksLoaded": true,
+    "messageHeight": 501,
+    "messageOverflow": false,
+    "overlap": false,
+    "phoneBrandCenterError": null,
+    "width": 960
+  },
+  {
+    "chipAbsent": true,
+    "composerButtons": [
+      "Add sources",
+      "Web search",
+      "Choose model",
+      "Send message"
+    ],
+    "composerOverflow": false,
+    "empty": true,
+    "height": 1000,
+    "marksLoaded": true,
+    "messageHeight": 91,
+    "messageOverflow": false,
+    "overlap": false,
+    "phoneBrandCenterError": null,
+    "width": 1440
+  },
+  {
+    "chipAbsent": true,
+    "composerButtons": [
+      "Add sources",
+      "Web search",
+      "Choose model",
+      "Send message"
+    ],
+    "composerOverflow": false,
+    "empty": false,
+    "height": 1000,
+    "marksLoaded": true,
+    "messageHeight": 801,
+    "messageOverflow": false,
+    "overlap": false,
+    "phoneBrandCenterError": null,
+    "width": 1440
+  }
+]

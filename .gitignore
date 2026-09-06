@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+.super-human/
 
 node_modules/
 .next/
@@ -10,6 +11,9 @@ build/
 out/
 target/
 coverage/
+playwright-report/
+test-results/
+tsconfig.tsbuildinfo
 
 *.log
 *.db

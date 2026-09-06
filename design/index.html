@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#111111">
+  <title>Vigilante — Conversations</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#messages">Skip to conversation</a>
+  <div class="app-shell">
+    <aside id="history-sidebar" class="history-sidebar" aria-label="Conversation history">
+      <div class="sidebar-header">
+        <span class="wordmark"><img class="brand-mark" src="assets/vigilante-mark.svg" alt="">vigilante</span>
+        <div class="sidebar-tools">
+          <button class="icon-button" data-action="search-history" aria-label="Search conversations" title="Search conversations"><span data-icon="search"></span></button>
+          <button class="icon-button" data-action="collapse-sidebar" aria-label="Hide sidebar" title="Hide sidebar" aria-controls="history-sidebar" aria-expanded="true"><span data-icon="panel"></span></button>
+        </div>
+      </div>
+      <button class="sidebar-new" data-action="new-conversation" aria-label="New conversation" title="New conversation"><span class="new-symbol"><span data-icon="plus"></span></span><span>New</span></button>
+      <h2>History</h2>
+      <nav id="desktop-history" aria-label="Saved conversations"></nav>
+    </aside>
+    <div class="workspace">
+      <header class="topbar"><button class="icon-button history-toggle" id="history-button" aria-label="Open conversation history" title="Conversation history"><span data-icon="menu"></span></button><span class="wordmark"><img class="brand-mark" src="assets/vigilante-mark.svg" alt="">vigilante</span><span id="conversation-title" class="sr-only">New conversation</span><button class="icon-button new-button" id="new-button" aria-label="New conversation" title="New conversation"><span data-icon="plus"></span></button></header>
+      <main id="main" class="conversation-shell empty">
+        <section id="messages" class="message-viewport" aria-label="Conversation" tabindex="-1"></section>
+        <div class="composer-dock"><div class="composer-width"><form id="composer-form" class="composer"><label for="composer-input" class="sr-only">Message</label><textarea id="composer-input" rows="1" placeholder="Ask anything…"></textarea><div class="composer-controls"><button type="button" class="icon-button" data-action="attach" aria-label="Add sources" title="Add sources"><span data-icon="plus"></span></button><button type="button" class="text-button web-button" id="web-button" data-action="web-toggle" aria-pressed="false" aria-label="Web search"><span data-icon="globe"></span><span>Web</span></button><button type="button" class="text-button model-button" data-action="model" aria-label="Choose model"><span>Local</span><span data-icon="chevron"></span></button><button class="icon-button send" id="send-button" type="submit" aria-label="Send message" disabled><span data-icon="up"></span></button></div></form></div></div>
+      </main>
+    </div>
+  </div>
+  <dialog id="dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <noscript><p>This interactive design requires JavaScript. Read <a href="how_vigilante_works.md">the handoff</a> for the specification.</p></noscript>
+</body>
+</html>

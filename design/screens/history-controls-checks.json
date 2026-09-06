@@ -1,0 +1,68 @@
+[
+  {
+    "composerOverflow": false,
+    "dialogOpen": true,
+    "dialogOverflow": false,
+    "dialogWidth": 480,
+    "height": 1000,
+    "messageOverflow": false,
+    "overlap": false,
+    "sidebarVisible": true,
+    "width": 1440
+  },
+  {
+    "composerOverflow": false,
+    "dialogOpen": false,
+    "dialogOverflow": false,
+    "dialogWidth": 0,
+    "height": 1000,
+    "messageOverflow": false,
+    "overlap": false,
+    "sidebarVisible": false,
+    "width": 1440
+  },
+  {
+    "composerOverflow": false,
+    "dialogOpen": false,
+    "dialogOverflow": false,
+    "dialogWidth": 0,
+    "height": 700,
+    "messageOverflow": false,
+    "overlap": false,
+    "sidebarVisible": false,
+    "width": 960
+  },
+  {
+    "composerOverflow": false,
+    "dialogOpen": false,
+    "dialogOverflow": false,
+    "dialogWidth": 0,
+    "height": 700,
+    "messageOverflow": false,
+    "overlap": false,
+    "sidebarVisible": true,
+    "width": 960
+  },
+  {
+    "composerOverflow": false,
+    "dialogOpen": true,
+    "dialogOverflow": false,
+    "dialogWidth": 320,
+    "height": 844,
+    "messageOverflow": false,
+    "overlap": false,
+    "sidebarVisible": false,
+    "width": 390
+  },
+  {
+    "composerOverflow": false,
+    "dialogOpen": true,
+    "dialogOverflow": false,
+    "dialogWidth": 281.59375,
+    "height": 568,
+    "messageOverflow": false,
+    "overlap": false,
+    "sidebarVisible": false,
+    "width": 320
+  }
+]
