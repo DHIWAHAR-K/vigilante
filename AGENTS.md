@@ -56,5 +56,7 @@ the foundation; application behavior is planned, not implemented.
 - Inspect the diff for credentials and unrelated changes. Use focused Conventional
   Commits as described in [CONTRIBUTING.md](CONTRIBUTING.md). Honor the requested
   commit/push scope; never rewrite shared history or bypass branch protection.
+- Check remote branch rules before publishing. `main` requires a pull request and
+  the GitHub Actions check named `Policy`; push feature branches and use that route.
 - Report the outcome, verification, and material limitations. Do not mark a roadmap
   milestone complete before its exit conditions hold.

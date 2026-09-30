@@ -12,9 +12,12 @@ work aligned with the current milestone.
 4. Update relevant documentation and decision records alongside the change.
 5. Run the checks that exist for the affected component, then review the diff.
 
-Use scoped branches for normal feature work, such as `feat/research-baseline` or
-`docs/evidence-contract`. Follow the owner's explicit Git workflow for bootstrap
-work and releases. Do not force-push shared branches or bypass repository rules.
+Use scoped branches such as `feat/research-baseline` or `docs/evidence-contract`.
+The existing GitHub rules require changes to `main` through a pull request, a passing
+`Policy` check, resolved review threads, and squash merging. Check the current rules
+before publishing. Do not force-push shared branches or use account bypass privileges.
+The foundation's `Policy` job runs the repository check; extend it with appropriate
+application checks as runnable components are introduced.
 
 ## Validation
 
