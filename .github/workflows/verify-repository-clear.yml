@@ -1,0 +1,47 @@
+name: Verify repository clear
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-empty-tree:
+    name: Policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require the authorized cleanup pull request
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          test "$PR_NUMBER" = '7'
+          test "$PR_HEAD_REPO" = "$GITHUB_REPOSITORY"
+          test "$PR_HEAD_REF" = 'codex/chore-clear-repository'
+      - name: Check out trusted base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - name: Verify the proposed commit contains no project files
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$PR_HEAD_SHA"
+          proposed_tree="$(git rev-parse "$PR_HEAD_SHA^{tree}")"
+          empty_tree="$(git hash-object -t tree --stdin </dev/null)"
+          if [ "$proposed_tree" != "$empty_tree" ]; then
+            echo "Expected an empty repository tree; project files remain."
+            git ls-tree -r --name-only "$PR_HEAD_SHA"
+            exit 1
+          fi
+          git diff --check "$PR_BASE_SHA" "$PR_HEAD_SHA"
+          echo "Verified empty repository tree for $PR_HEAD_SHA."
