@@ -1,0 +1,5 @@
+{
+  "name": "@vigilante/search-client",
+  "private": true,
+  "description": "Client for POST /v1/passages."
+}

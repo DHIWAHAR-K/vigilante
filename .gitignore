@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.next/
+.turbo/
+.env
+.env.*
+.vercel/
+.wrangler/
+target/
+src-tauri/target/
+.DS_Store
+logs/
+*.log
+.cursor/plans/
+*.plan.md

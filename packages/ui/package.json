@@ -1,0 +1,5 @@
+{
+  "name": "@vigilante/ui",
+  "private": true,
+  "description": "Shared tokens, later src/globals.css."
+}

@@ -1,0 +1,5 @@
+{
+  "name": "@vigilante/harness",
+  "private": true,
+  "description": "Plan, read, draft, and check. No model SDK and no network."
+}

@@ -1,0 +1,5 @@
+{
+  "name": "@vigilante/desktop",
+  "private": true,
+  "description": "Tauri notebook."
+}

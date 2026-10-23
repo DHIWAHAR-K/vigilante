@@ -1,0 +1,5 @@
+{
+  "name": "@vigilante/model",
+  "private": true,
+  "description": "Client for the bundled localhost runtime."
+}

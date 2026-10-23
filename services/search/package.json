@@ -1,0 +1,5 @@
+{
+  "name": "@vigilante/search",
+  "private": true,
+  "description": "Cloudflare hot lane, deep lane, and retrieval worker."
+}
